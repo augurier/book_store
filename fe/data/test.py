@@ -10,5 +10,5 @@ conn = sqlite3.connect(book_db)
 cursor = conn.execute("select * from book")#修改需查看的内容
 # print(len(cursor))
 for row in cursor:
-    print(row[0:3])
+    print(row[0:9])
     # print(len(row))
