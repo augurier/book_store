@@ -1,4 +1,4 @@
-#将书本存入本地mongodb
+#灏嗕功鏈瓨鍏ユ湰鍦癿ongodb
 import os
 import sqlite3
 import pymongo
@@ -50,10 +50,11 @@ for row in cursor:
             'tags' : row[15],
             'picture' : row[16],
     }
+    print(book['title'])
     booklist.append(book)
     
 result = mycol.insert_many(booklist)
 
 # content = mycol.find()
 # for each in content:
-#     print(each)
+#     print(each['title'])

@@ -1,11 +1,14 @@
-#´ÖÂÔ²é¿´.dbÎÄ¼şÄÚÈİ
+#ç²—ç•¥æŸ¥çœ‹.dbæ–‡ä»¶å†…å®¹
 import os
 import sqlite3
 
 
 parent_path = os.path.dirname(os.path.dirname(__file__))
-book_db = os.path.join(parent_path, "data/book.db")#ĞŞ¸ÄĞè²é¿´µÄÎÄ¼ş
+book_db = os.path.join(parent_path, "../book.db")#ä¿®æ”¹éœ€æŸ¥çœ‹çš„æ–‡ä»¶
+print(book_db)
 conn = sqlite3.connect(book_db)
-cursor = conn.execute("select * from book")#ĞŞ¸ÄĞè²é¿´µÄÄÚÈİ
+cursor = conn.execute("select * from book")#ä¿®æ”¹éœ€æŸ¥çœ‹çš„å†…å®¹
+# print(len(cursor))
 for row in cursor:
-    print(row)
+    print(row[0:3])
+    # print(len(row))

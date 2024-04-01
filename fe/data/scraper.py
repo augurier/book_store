@@ -67,6 +67,7 @@ user_agent = [
 
 def get_user_agent():
     headers = {"User-Agent": random.choice(user_agent)}
+    print(get_user_agent.__name__,headers)
     return headers
 
 
@@ -104,6 +105,7 @@ class Scraper:
         scraper.grab_tag()
         current_tag, current_page = self.get_current_progress()
         tags = self.get_tag_list()
+        print(tags)
         for i in range(0, len(tags)):
             no = 0
             if i == 0 and current_tag == tags[i]:
@@ -151,12 +153,25 @@ class Scraper:
         r = requests.get(url, headers=get_user_agent())
         r.encoding = "utf-8"
         h: etree.ElementBase = etree.HTML(r.text)
+        print(self.grab_tag.__name__,h.text)
+        # tags: [] = h.xpath(
+        #     '/html/body/div[@id="wrapper"]/div[@id="content"]'
+        #     '/div[@class="grid-16-8 clearfix"]/div[@class="article"]'
+        #     '/div[@class=""]/div[@class="indent tag_cloud"]'
+        #     "/table/tbody/tr/td/a/@href"
+        # )
         tags: [] = h.xpath(
             '/html/body/div[@id="wrapper"]/div[@id="content"]'
             '/div[@class="grid-16-8 clearfix"]/div[@class="article"]'
-            '/div[@class=""]/div[@class="indent tag_cloud"]'
+            '/div[2]/div'
             "/table/tbody/tr/td/a/@href"
         )
+#         tags: [] = h.xpath(
+# '/html/body/div[3]/div[1]/div/div[1]/div[2]/div/table/tbody/tr/td/a/@href'
+#         )
+
+        # print('tags',*map(lambda x: x.strip('/tag'),tags))
+        # return False
         conn = sqlite3.connect(self.database)
         c = conn.cursor()
         try:
@@ -235,7 +250,7 @@ class Scraper:
             return False
 
         title = e_text[0]
-
+        print(self.crow_book_info.__name__,title)
         elements = h.xpath(
             '/html/body/div[@id="wrapper"]'
             '/div[@id="content"]/div[@class="grid-16-8 clearfix"]'
