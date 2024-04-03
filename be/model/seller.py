@@ -58,7 +58,7 @@ class Seller(db_conn.DBConn):
             return 530, "{}".format(str(e))
         return 200, "ok"
 
-    def create_store(self, user_id: str, store_id: str) -> (int, str):
+    def create_store(self, user_id: str, store_id: str) -> tuple[(int, str)]:
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
@@ -74,3 +74,23 @@ class Seller(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
         return 200, "ok"
+
+    def deliver(self,order_id:str):
+        conn=self.conn
+        try:
+            cursor=conn.execute("SELECT state FROM history_order WHERE order_id=?",(order_id,))
+            row=cursor.fetchone()
+            if row == None: 
+                return error.error_invalid_order_id(order_id)
+            state=cursor[0]
+            if not state=='wait for delivery':
+                return error.error_invalid_order_id(order_id)
+            cursor=conn.execute("UPDATE history_order SET state='delivering' WHERE order_id=?",(order_id,))
+            if cursor.rowcount==0:
+                return error.error_invalid_order_id(order_id)
+            conn.commit()
+        except sqlite.Error as e:
+            return 528,"{}".format(str(e))
+        except BaseException as e:
+            return 530,"{}".format(str(e))
+        return 200,"ok"

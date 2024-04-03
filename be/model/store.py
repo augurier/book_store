@@ -3,7 +3,6 @@ import os
 import sqlite3 as sqlite
 import threading
 
-
 class Store:
     database: str
 
@@ -14,6 +13,21 @@ class Store:
     def init_tables(self):
         try:
             conn = self.get_db_conn()
+
+            conn.execute("""DROP TABLE IF EXISTS user""")
+
+            conn.execute("""DROP TABLE IF EXISTS user_store""")
+
+            conn.execute("""DROP TABLE IF EXISTS store""")
+
+            conn.execute("""DROP TABLE IF EXISTS new_order""")
+
+            conn.execute("""DROP TABLE IF EXISTS new_order_detail""")
+
+            conn.execute("""DROP TABLE IF EXISTS history_order""")
+
+            conn.execute("""DROP TABLE IF EXISTS history_order_detail""")
+
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS user ("
                 "user_id TEXT PRIMARY KEY, password TEXT NOT NULL, "
@@ -33,11 +47,26 @@ class Store:
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS new_order( "
-                "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT)"
+                "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT),"
+                "state TEXT DEFAULT 'wait for payment',"
+                "order_datetime DateTime"
             )
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS new_order_detail( "
+                "order_id TEXT, book_id TEXT, count INTEGER, price INTEGER,  "
+                "PRIMARY KEY(order_id, book_id))"
+            )
+
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS history_order( "
+                "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT),"
+                "state TEXT DEFAULT 'wait for payment',"
+                "order_datetime DateTime"
+            )
+
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS history_order_detail( "
                 "order_id TEXT, book_id TEXT, count INTEGER, price INTEGER,  "
                 "PRIMARY KEY(order_id, book_id))"
             )

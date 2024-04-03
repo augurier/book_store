@@ -4,6 +4,7 @@ import json
 import logging
 from be.model import db_conn
 from be.model import error
+import time
 
 
 class Buyer(db_conn.DBConn):
@@ -11,8 +12,8 @@ class Buyer(db_conn.DBConn):
         db_conn.DBConn.__init__(self)
 
     def new_order(
-        self, user_id: str, store_id: str, id_and_count: [(str, int)]
-    ) -> (int, str, str):
+        self, user_id: str, store_id: str, id_and_count: tuple[(str, int)]
+    ) -> tuple[(int, str, str)]:
         order_id = ""
         try:
             if not self.user_id_exist(user_id):
@@ -53,10 +54,11 @@ class Buyer(db_conn.DBConn):
                     (uid, book_id, count, price),
                 )
 
+            cur_time = time.strftime("%Y-%m-%d %H:%M:%S")
             self.conn.execute(
-                "INSERT INTO new_order(order_id, store_id, user_id) "
-                "VALUES(?, ?, ?);",
-                (uid, store_id, user_id),
+                "INSERT INTO new_order(order_id, store_id, user_id,state,order_time) "
+                "VALUES(?, ?, ?, ?, ?);",
+                (uid, store_id, user_id, "wait for payment", cur_time),
             )
             self.conn.commit()
             order_id = uid
@@ -69,7 +71,7 @@ class Buyer(db_conn.DBConn):
 
         return 200, "ok", order_id
 
-    def payment(self, user_id: str, password: str, order_id: str) -> (int, str):
+    def payment(self, user_id: str, password: str, order_id: str) -> tuple[int, str]:
         conn = self.conn
         try:
             cursor = conn.execute(
@@ -139,12 +141,33 @@ class Buyer(db_conn.DBConn):
             if cursor.rowcount == 0:
                 return error.error_non_exist_user_id(seller_id)
 
+            # order从new_order中删除并插入history_order中
+            cursor = conn.execute(
+                "INSERT INTO history_order"
+                "(SELECT * FROM new_order WHERE order_id=?)",
+                (order_id,),
+            )
+            # 更新state为等待发货
+            cursor = conn.execute(
+                "UPDATE history_order"
+                "set state='wait for delivery"
+                "where order_id=?",
+                (order_id,),
+            )
+            if cursor.rowcount == 0:
+                return error.error_invalid_order_id(order_id)
             cursor = conn.execute(
                 "DELETE FROM new_order WHERE order_id = ?", (order_id,)
             )
             if cursor.rowcount == 0:
                 return error.error_invalid_order_id(order_id)
 
+            # order_detail从new_order_detail中删除并插入history_order_detail中
+            cursor = conn.execute(
+                "INSERT INTO history_order_detail"
+                "(SELECT * FROM new_order_detail WHERE order_id=?)",
+                (order_id,),
+            )
             cursor = conn.execute(
                 "DELETE FROM new_order_detail where order_id = ?", (order_id,)
             )
@@ -161,7 +184,7 @@ class Buyer(db_conn.DBConn):
 
         return 200, "ok"
 
-    def add_funds(self, user_id, password, add_value) -> (int, str):
+    def add_funds(self, user_id, password, add_value) -> tuple[int, str]:
         try:
             cursor = self.conn.execute(
                 "SELECT password  from user where user_id=?", (user_id,)
@@ -187,3 +210,73 @@ class Buyer(db_conn.DBConn):
             return 530, "{}".format(str(e))
 
         return 200, "ok"
+
+    def cancel_order(
+        self, user_id: str, order_id: str
+    ) -> tuple[int, str]:
+        conn = self.conn
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+            #修改state状态，并将其从new_order移到history_order
+            cursor = conn.execute(
+                "UPDATE new_order SET state='cancelled' WHERE user_id=? AND order_id=? AND state='wait for payment'",
+                (user_id,order_id)
+            )
+            if cursor.rowcount==0:
+                return error.error_invalid_order_id(order_id)
+            
+            cursor=conn.execute(
+                "INSERT INTO history_order"
+                "(SELECT * FROM new_order WHERE order_id=?)",
+                (order_id,)
+            )
+            cursor=conn.execute(
+                "DELETE FROM new_order"
+                "WHERE order_id=?",
+                (order_id,)
+            )
+            if cursor.rowcount==0:
+                return error.error_invalid_order_id(order_id)
+            
+            #将new_order_detail做出相应的改动
+            cursor=conn.execute(
+                "INSERT INTO history_order_detail"
+                "(SELECT * FROM new_order_detail WHERE order_id=?)",
+                (order_id,)
+            )
+            cursor=conn.execute(
+                "DELETE FROM new_order"
+                "WHERE order_id=?",
+                (order_id,)
+            )
+            if cursor.rowcount==0:
+                return error.error_invalid_order_id(order_id)
+
+            conn.commit()
+        except sqlite.Error as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200,"ok"
+
+    def receive(self, user_id: str, order_id: str) -> tuple[(int,str)]:
+        conn = self.conn
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+
+            cursor=conn.execute(
+                "UPDATE history_order SET state='received'"
+                "WHERE user_id=? AND order_id=? AND state='delivering'",
+                (user_id,order_id)
+            )
+            if cursor.rowcount==0:
+                return error.error_invalid_order_id(order_id)
+
+            conn.commit()
+        except sqlite.Error as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200,"ok"
