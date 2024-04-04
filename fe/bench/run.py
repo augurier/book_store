@@ -6,6 +6,7 @@ import logging
 from fe.bench.workload import Workload
 from fe.bench.session import Session
 
+logging.basicConfig(filename='bench.log',level=logging.INFO)
 
 def run_bench():
     wl = Workload()
@@ -24,6 +25,5 @@ def run_bench():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='test.log',filemode='w',level=logging.INFO)
     logging.info("bench start")
     run_bench()

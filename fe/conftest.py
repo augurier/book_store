@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from be import serve
 from be.model.store import init_completed_event
 from fe import conf
-
+import logging
 thread: threading.Thread = None
 
 

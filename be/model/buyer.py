@@ -56,7 +56,7 @@ class Buyer(db_conn.DBConn):
 
             cur_time = time.strftime("%Y-%m-%d %H:%M:%S")
             self.conn.execute(
-                "INSERT INTO new_order(order_id, store_id, user_id,state,order_time) "
+                "INSERT INTO new_order(order_id, store_id, user_id,state,order_datetime) "
                 "VALUES(?, ?, ?, ?, ?);",
                 (uid, store_id, user_id, "wait for payment", cur_time),
             )
@@ -126,7 +126,7 @@ class Buyer(db_conn.DBConn):
                 return error.error_not_sufficient_funds(order_id)
 
             cursor = conn.execute(
-                "UPDATE user set balance = balance - ?"
+                "UPDATE user set balance = balance - ? "
                 "WHERE user_id = ? AND balance >= ?",
                 (total_price, buyer_id, total_price),
             )
@@ -143,15 +143,15 @@ class Buyer(db_conn.DBConn):
 
             # order从new_order中删除并插入history_order中
             cursor = conn.execute(
-                "INSERT INTO history_order"
-                "(SELECT * FROM new_order WHERE order_id=?)",
+                "INSERT INTO history_order "
+                "SELECT * FROM new_order WHERE order_id=?",
                 (order_id,),
             )
             # 更新state为等待发货
             cursor = conn.execute(
-                "UPDATE history_order"
-                "set state='wait for delivery"
-                "where order_id=?",
+                "UPDATE history_order "
+                "SET state='wait for delivery' "
+                "WHERE order_id=?",
                 (order_id,),
             )
             if cursor.rowcount == 0:
@@ -164,10 +164,11 @@ class Buyer(db_conn.DBConn):
 
             # order_detail从new_order_detail中删除并插入history_order_detail中
             cursor = conn.execute(
-                "INSERT INTO history_order_detail"
-                "(SELECT * FROM new_order_detail WHERE order_id=?)",
+                "INSERT INTO history_order_detail "
+                "SELECT * FROM new_order_detail WHERE order_id=?",
                 (order_id,),
             )
+            conn.commit()
             cursor = conn.execute(
                 "DELETE FROM new_order_detail where order_id = ?", (order_id,)
             )
@@ -177,6 +178,7 @@ class Buyer(db_conn.DBConn):
             conn.commit()
 
         except sqlite.Error as e:
+            logging.error(str(e))
             return 528, "{}".format(str(e))
 
         except BaseException as e:
@@ -187,7 +189,7 @@ class Buyer(db_conn.DBConn):
     def add_funds(self, user_id, password, add_value) -> tuple[int, str]:
         try:
             cursor = self.conn.execute(
-                "SELECT password  from user where user_id=?", (user_id,)
+                "SELECT password from user where user_id=?", (user_id,)
             )
             row = cursor.fetchone()
             if row is None:
@@ -220,19 +222,19 @@ class Buyer(db_conn.DBConn):
                 return error.error_non_exist_user_id(user_id)
             #修改state状态，并将其从new_order移到history_order
             cursor = conn.execute(
-                "UPDATE new_order SET state='cancelled' WHERE user_id=? AND order_id=? AND state='wait for payment'",
+                "UPDATE new_order set state='cancelled' WHERE user_id=? AND order_id=? AND state='wait for payment'",
                 (user_id,order_id)
             )
             if cursor.rowcount==0:
                 return error.error_invalid_order_id(order_id)
             
             cursor=conn.execute(
-                "INSERT INTO history_order"
-                "(SELECT * FROM new_order WHERE order_id=?)",
+                "INSERT INTO history_order "
+                "SELECT * FROM new_order WHERE order_id=?",
                 (order_id,)
             )
             cursor=conn.execute(
-                "DELETE FROM new_order"
+                "DELETE FROM new_order "
                 "WHERE order_id=?",
                 (order_id,)
             )
@@ -241,12 +243,12 @@ class Buyer(db_conn.DBConn):
             
             #将new_order_detail做出相应的改动
             cursor=conn.execute(
-                "INSERT INTO history_order_detail"
-                "(SELECT * FROM new_order_detail WHERE order_id=?)",
+                "INSERT INTO history_order_detail "
+                "SELECT * FROM new_order_detail WHERE order_id=?",
                 (order_id,)
             )
             cursor=conn.execute(
-                "DELETE FROM new_order"
+                "DELETE FROM new_order_detail "
                 "WHERE order_id=?",
                 (order_id,)
             )
@@ -255,6 +257,7 @@ class Buyer(db_conn.DBConn):
 
             conn.commit()
         except sqlite.Error as e:
+            logging.error(str(e))
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
@@ -267,7 +270,7 @@ class Buyer(db_conn.DBConn):
                 return error.error_non_exist_user_id(user_id)
 
             cursor=conn.execute(
-                "UPDATE history_order SET state='received'"
+                "UPDATE history_order SET state='received' "
                 "WHERE user_id=? AND order_id=? AND state='delivering'",
                 (user_id,order_id)
             )
