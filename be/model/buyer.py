@@ -315,3 +315,31 @@ class Buyer(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
         return 200,"ok"
+    
+    #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
+    def search(self,keyword:str,content:str,store_id:str) -> tuple[(int,str,list[str])]:
+        conn = self.conn
+        book_conn=self.book_conn
+        try:
+            sql = """select distinct book_id from store """
+            if not store_id=="":
+                sql+=" where store_id={}".format(store_id)
+                if not self.store_id_exist(store_id):
+                    return error.error_non_exist_store_id(store_id)
+            cursor=conn.execute(sql)
+            if cursor.rowcount == 0:
+                return 200,"ok",[]
+            
+            bids:tuple[str,]=tuple(map(lambda x:x[0],cursor.fetchall()))
+            search_sql="""select id from book 
+                where id in {} and {} like '%{}%'""".format(bids,keyword,content)
+            cursor=book_conn.execute(search_sql)
+            if cursor.rowcount==0:
+                return 200,"ok",[]
+            res=list(map(lambda x:x[0],cursor.fetchall()))
+            conn.commit()
+        except sqlite.Error as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200,"ok",res

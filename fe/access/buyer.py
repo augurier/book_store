@@ -68,3 +68,16 @@ class Buyer:
         headers = {"token": self.token}
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
+
+    def search(self,keyword,content,store_id="")->tuple[int,list[str]]:
+        json={
+            "keyword":keyword,
+            "content":content,
+            "store_id":store_id,
+        }
+        url=urljoin(self.url_prefix,"search")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        return r.status_code,bids_json

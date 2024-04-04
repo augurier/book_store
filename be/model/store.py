@@ -8,11 +8,13 @@ class Store:
 
     def __init__(self, db_path):
         self.database = os.path.join(db_path, "be.db")
+        self.book_db=os.path.join(db_path,"book.db")
+        # logging.error(os.path.dirname(__file__))
         self.init_tables()
 
     def init_tables(self):
         try:
-            conn = self.get_db_conn()
+            conn , book_conn= self.get_db_conn()
 
             conn.execute("""DROP TABLE IF EXISTS user""")
 
@@ -27,6 +29,8 @@ class Store:
             conn.execute("""DROP TABLE IF EXISTS history_order""")
 
             conn.execute("""DROP TABLE IF EXISTS history_order_detail""")
+
+            # conn.execute("DROP TABLE IF EXISTS book")
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS user ("
@@ -71,13 +75,37 @@ class Store:
                 "PRIMARY KEY(order_id, book_id))"
             )
 
+            # conn.execute(
+            #     """
+            #     CREATE TABLE IF NOT EXISTS book (
+            #         id TEXT PRIMARY KEY,
+            #         title TEXT,
+            #         author TEXT,
+            #         publisher TEXT,
+            #         original_title TEXT,
+            #         translator TEXT,
+            #         pub_year TEXT,
+            #         pages INTEGER,
+            #         price INTEGER,
+            #         currency_unit TEXT,
+            #         binding TEXT,
+            #         isbn TEXT,
+            #         author_intro TEXT,
+            #         book_intro TEXT,
+            #         content TEXT,
+            #         tags TEXT,
+            #         picture BLOB                   
+            #     )
+            #     """
+            # )
+
             conn.commit()
         except sqlite.Error as e:
             logging.error(e)
             conn.rollback()
 
-    def get_db_conn(self) -> sqlite.Connection:
-        return sqlite.connect(self.database)
+    def get_db_conn(self) -> tuple[(sqlite.Connection,sqlite.Connection)]:
+        return sqlite.connect(self.database),sqlite.connect(self.book_db)
 
 
 database_instance: Store = None

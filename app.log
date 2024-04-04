@@ -11,3 +11,98 @@ INFO:root:TPS_C=23823, NO=OK:3600 Thread_num:800 TOTAL:3600 LATENCY:0.0174068005
 INFO:root:TPS_C=26660, NO=OK:4500 Thread_num:900 TOTAL:4500 LATENCY:0.017348611142900254 , P=OK:3600 Thread_num:800 TOTAL:3600 LATENCY:0.018231997357474432
 INFO:root:TPS_C=29501, NO=OK:5500 Thread_num:1000 TOTAL:5500 LATENCY:0.017307293371720746 , P=OK:4500 Thread_num:900 TOTAL:4500 LATENCY:0.018248612562815347
 ERROR:root:no such table: hisory_order
+ERROR:be.serve:Exception on /buyer/search [POST]
+Traceback (most recent call last):
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 2051, in wsgi_app
+    response = self.full_dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1501, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1499, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1485, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "D:\wuwen\ECNU\大二下\数据库\大作业\book_store\be\view\buyer.py", line 69, in search
+    return jsonify({'message':message,'bids':jsonify(bids)}),code
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 348, in jsonify
+    f"{dumps(data, indent=indent, separators=separators)}\n",
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 129, in dumps
+    rv = _json.dumps(obj, **kwargs)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 56, in default
+    return super().default(o)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Response is not JSON serializable
+ERROR:be.serve:Exception on /buyer/search [POST]
+Traceback (most recent call last):
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 2051, in wsgi_app
+    response = self.full_dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1501, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1499, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1485, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "D:\wuwen\ECNU\大二下\数据库\大作业\book_store\be\view\buyer.py", line 69, in search
+    return jsonify({'message':message,'bids':jsonify(bids)}),code
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 348, in jsonify
+    f"{dumps(data, indent=indent, separators=separators)}\n",
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 129, in dumps
+    rv = _json.dumps(obj, **kwargs)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\json\__init__.py", line 56, in default
+    return super().default(o)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\json\encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Response is not JSON serializable
+ERROR:be.serve:Exception on /buyer/search [POST]
+Traceback (most recent call last):
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 2051, in wsgi_app
+    response = self.full_dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1501, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1499, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1485, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "D:\wuwen\ECNU\大二下\数据库\大作业\book_store\be\view\buyer.py", line 68, in search
+    code,message,bids=b.search(keyword,content,store_id)
+ValueError: not enough values to unpack (expected 3, got 2)
+INFO:root:1
+INFO:root:2
+ERROR:be.serve:Exception on /buyer/search [POST]
+Traceback (most recent call last):
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 2051, in wsgi_app
+    response = self.full_dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1501, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1499, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "D:\tools\Python\anaconda3\envs\ds\lib\site-packages\flask\app.py", line 1485, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "D:\wuwen\ECNU\大二下\数据库\大作业\book_store\be\view\buyer.py", line 68, in search
+    code,message,bids=b.search(keyword,content,store_id)
+ValueError: not enough values to unpack (expected 3, got 2)
+INFO:root:1
+INFO:root:1
+INFO:root:滚滚红尘
+INFO:root:1
+INFO:root:温柔的夜
+INFO:root:1
+INFO:root:GUI设计禁忌2.0
+INFO:root:1
+INFO:root:哈利波特完整系列
+INFO:root:1
+INFO:root:我的宝贝
+INFO:root:2
+INFO:root:撒哈拉的故事

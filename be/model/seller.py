@@ -1,7 +1,7 @@
 import sqlite3 as sqlite
 from be.model import error
 from be.model import db_conn
-
+import json
 
 class Seller(db_conn.DBConn):
     def __init__(self):
@@ -28,6 +28,12 @@ class Seller(db_conn.DBConn):
                 "VALUES (?, ?, ?, ?)",
                 (store_id, book_id, book_json_str, stock_level),
             )
+
+            # decoder=json.JSONDecoder()
+            # book_info=decoder.decode(book_json_str)
+            # self.book_conn.execute(
+            #     """INSERT INTO book """
+            # )
             self.conn.commit()
         except sqlite.Error as e:
             return 528, "{}".format(str(e))
