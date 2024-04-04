@@ -54,7 +54,8 @@ class Buyer(db_conn.DBConn):
                     (uid, book_id, count, price),
                 )
 
-            cur_time = time.strftime("%Y-%m-%d %H:%M:%S")
+            # cur_time = time.strftime("%Y-%m-%d %H:%M:%S")
+            cur_time=str(int(time.time())) #纪元以来的秒数
             self.conn.execute(
                 "INSERT INTO new_order(order_id, store_id, user_id,state,order_datetime) "
                 "VALUES(?, ?, ?, ?, ?);",
@@ -71,11 +72,37 @@ class Buyer(db_conn.DBConn):
 
         return 200, "ok", order_id
 
+    #调用之前需要调用者保证order_id合法
+    def order_timeout(self,order_id:str) -> tuple[(int,str)]:
+        conn=self.conn
+        try:
+            cursor=conn.execute("INSERT INTO history_order SELECT * FROM new_order WHERE order_id=?",
+                                (order_id,))
+            cursor=conn.execute("UPDATE history_order SET state = 'cancelled' "
+                                "WHERE state='wait for payment' AND order_id=?",
+                                (order_id,))
+            cursor=conn.execute("DELETE FROM new_order WHERE order_id=?",
+                                (order_id,))
+            
+            cursor=conn.execute("INSERT INTO history_order_detail SELECT * FROM new_order_detail "
+                                "WHERE order_id=?",
+                                (order_id,))
+            cursor=conn.execute("DELETE FROM new_order_detail WHERE order_id=?",
+                                (order_id,))
+
+        except sqlite.Error as e:
+            logging.error(str(e))
+            return 528, "{}".format(str(e))
+
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return error.error_order_timeout(order_id)
+
     def payment(self, user_id: str, password: str, order_id: str) -> tuple[int, str]:
         conn = self.conn
         try:
             cursor = conn.execute(
-                "SELECT order_id, user_id, store_id FROM new_order WHERE order_id = ?",
+                "SELECT order_id, user_id, store_id,order_datetime FROM new_order WHERE order_id = ?",
                 (order_id,),
             )
             row = cursor.fetchone()
@@ -85,9 +112,13 @@ class Buyer(db_conn.DBConn):
             order_id = row[0]
             buyer_id = row[1]
             store_id = row[2]
-
+            order_datetime=int(row[3])
             if buyer_id != user_id:
                 return error.error_authorization_fail()
+            
+            timeout_limit=1 #这里的超时时间设置为1秒，方便调试
+            if order_datetime+timeout_limit<int(time.time()):
+                return self.order_timeout(order_id)
 
             cursor = conn.execute(
                 "SELECT balance, password FROM user WHERE user_id = ?;", (buyer_id,)
@@ -222,7 +253,8 @@ class Buyer(db_conn.DBConn):
                 return error.error_non_exist_user_id(user_id)
             #修改state状态，并将其从new_order移到history_order
             cursor = conn.execute(
-                "UPDATE new_order set state='cancelled' WHERE user_id=? AND order_id=? AND state='wait for payment'",
+                "UPDATE new_order set state='cancelled' "
+                "WHERE user_id=? AND order_id=? AND state='wait for payment'",
                 (user_id,order_id)
             )
             if cursor.rowcount==0:

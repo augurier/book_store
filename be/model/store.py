@@ -60,8 +60,8 @@ class Store:
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS history_order( "
-                "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT,"
-                "state TEXT DEFAULT 'wait for payment',"
+                "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT, "
+                "state TEXT DEFAULT 'wait for payment', "
                 "order_datetime TEXT)"
             )
 

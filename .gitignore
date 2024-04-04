@@ -4,3 +4,4 @@ __pycache__
 fe/data/*
 be.db
 *.ipynb
+*.log

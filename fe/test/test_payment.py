@@ -5,7 +5,7 @@ from fe.test.gen_book_data import GenBook
 from fe.access.new_buyer import register_new_buyer
 from fe.access.book import Book
 import uuid
-
+import time
 
 class TestPayment:
     seller_id: str
@@ -70,3 +70,10 @@ class TestPayment:
 
         code = self.buyer.payment(self.order_id)
         assert code != 200
+
+    def test_time_out(self):
+        code=self.buyer.add_funds(self.total_price)
+        assert code == 200
+        time.sleep(2)
+        code = self.buyer.payment(self.order_id)
+        assert code ==520
