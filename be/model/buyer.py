@@ -323,23 +323,59 @@ class Buyer(db_conn.DBConn):
         try:
             sql = """select distinct book_id from store """
             if not store_id=="":
-                sql+=" where store_id={}".format(store_id)
+                sql+=" where store_id='{}'".format(store_id)
                 if not self.store_id_exist(store_id):
-                    return error.error_non_exist_store_id(store_id)
+                    return error.error_non_exist_store_id(store_id)+([],)
+            # logging.info(sql)
             cursor=conn.execute(sql)
-            if cursor.rowcount == 0:
+            # if cursor.rowcount == 0:
+            #     return 200,"ok",[]
+            logging.info(cursor.rowcount)
+            row=cursor.fetchall()
+            logging.info(row)
+            if row == []:
                 return 200,"ok",[]
-            
-            bids:tuple[str,]=tuple(map(lambda x:x[0],cursor.fetchall()))
+            bids:tuple[str,]=tuple(map(lambda x:x[0],row))
+            if len(bids) == 1 :
+                bids="('"+str(bids[0])+"')"
             search_sql="""select id from book 
                 where id in {} and {} like '%{}%'""".format(bids,keyword,content)
+            # logging.info(search_sql)
             cursor=book_conn.execute(search_sql)
-            if cursor.rowcount==0:
+            # if cursor.rowcount==0:
+            #     return 200,"ok",[]
+            row = cursor.fetchall()
+            if row == []:
                 return 200,"ok",[]
-            res=list(map(lambda x:x[0],cursor.fetchall()))
+            res=list(map(lambda x:x[0],row))
             conn.commit()
         except sqlite.Error as e:
-            return 528, "{}".format(str(e))
+            logging.info(str(e))
+            return 528, "{}".format(str(e)),[]
         except BaseException as e:
-            return 530, "{}".format(str(e))
+            return 530, "{}".format(str(e)),[]
+        return 200,"ok",res
+
+    def history_order(self,user_id:str)->tuple[int,str,list[any]]:
+        '''返回order_id,store_id,state,order_datetime,book_id,count,price'''
+        conn = self.conn
+        book_conn=self.book_conn
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)+([],)
+            sql="""
+                select A.order_id,A.store_id,state,order_datetime,B.book_id,count,price 
+                from history_order as A 
+                join history_order_detail as B on A.order_id=B.order_id
+                join store as C on A.store_id=C.store_id and B.book_id=C.book_id
+                where user_id='{}'""".format(user_id)
+            cursor=conn.execute(sql)
+            res=cursor.fetchall()
+            
+            conn.commit()
+        except sqlite.Error as e:
+            logging.info(str(e))
+            return 528, "{}".format(str(e)),[]
+        except BaseException as e:
+            return 530, "{}".format(str(e)),[]
         return 200,"ok",res

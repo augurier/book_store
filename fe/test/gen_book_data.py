@@ -21,7 +21,7 @@ class GenBook:
 
     def gen(
         self, non_exist_book_id: bool, low_stock_level, max_book_count: int = 100
-    ) -> (bool, []):
+    ) -> tuple[(bool, list[any])]:
         self.__init_book_list__()
         ok = True
         book_db = book.BookDB(conf.Use_Large_DB)

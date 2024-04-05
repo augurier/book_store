@@ -67,3 +67,10 @@ def search():
     b=Buyer()
     code,message,bids=b.search(keyword,content,store_id)
     return jsonify({'message':message,'bids':bids}),code
+
+@bp_buyer.route("/history_order",methods=["POST"])
+def history_order():
+    user_id=request.json.get("user_id")
+    b=Buyer()
+    code,message,history_order=b.history_order(user_id)
+    return jsonify({'message':message,"history_order":history_order}),code
