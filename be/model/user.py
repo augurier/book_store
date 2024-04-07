@@ -76,7 +76,7 @@ class User(db_conn.DBConn):
             return error.error_exist_user_id(user_id)
         return 200, "ok"
 
-    def check_token(self, user_id: str, token: str) -> (int, str):
+    def check_token(self, user_id: str, token: str) -> tuple[(int, str)]:
         col_user = self.database["user"]
         row = col_user.find_one({'user_id': user_id}, {'_id': 0, 'token': 1})
         # cursor = self.conn.execute("SELECT token from user where user_id=?", (user_id,))
@@ -88,7 +88,7 @@ class User(db_conn.DBConn):
             return error.error_authorization_fail()
         return 200, "ok"
 
-    def check_password(self, user_id: str, password: str) -> (int, str):
+    def check_password(self, user_id: str, password: str) -> tuple[(int, str)]:
         col_user = self.database["user"]
         row = col_user.find_one({'user_id': user_id}, {'_id': 0, 'password': 1})
         # cursor = self.conn.execute(
@@ -103,7 +103,7 @@ class User(db_conn.DBConn):
 
         return 200, "ok"
 
-    def login(self, user_id: str, password: str, terminal: str) -> (int, str, str):
+    def login(self, user_id: str, password: str, terminal: str) -> tuple[(int, str, str)]:
         token = ""
         try:
             code, message = self.check_password(user_id, password)
@@ -153,7 +153,7 @@ class User(db_conn.DBConn):
 
         return 200, "ok"
 
-    def unregister(self, user_id: str, password: str) -> (int, str):
+    def unregister(self, user_id: str, password: str) -> tuple[(int, str)]:
         try:
             code, message = self.check_password(user_id, password)
             if code != 200:

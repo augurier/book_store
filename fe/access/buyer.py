@@ -48,3 +48,47 @@ class Buyer:
         headers = {"token": self.token}
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
+
+    def cancel_order(self, order_id: str) -> int:
+        json = {
+            "user_id": self.user_id,
+            "order_id": order_id,
+        }
+        url = urljoin(self.url_prefix, "cancel_order")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+
+    def receive(self, order_id: str) -> int:
+        json = {
+            "user_id": self.user_id,
+            "order_id": order_id,
+        }
+        url = urljoin(self.url_prefix, "receive")
+        headers = {"token": self.token}
+        r = requests.post(url, headers=headers, json=json)
+        return r.status_code
+
+    def search(self,keyword,content,store_id="")->tuple[int,list[str]]:
+        json={
+            "keyword":keyword,
+            "content":content,
+            "store_id":store_id,
+        }
+        url=urljoin(self.url_prefix,"search")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        return r.status_code,bids_json
+
+    def history_order(self)->tuple[int,list[any]]:
+        json={
+            "user_id":self.user_id,
+        }
+        url=urljoin(self.url_prefix,"history_order")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        history_order_json=response_json.get("history_order")
+        return r.status_code,history_order_json

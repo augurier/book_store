@@ -1,6 +1,8 @@
 import logging
 import pymongo
 import threading
+import pymongo.errors as mongo_error
+
 
 
 class Store:
@@ -16,7 +18,6 @@ class Store:
             #conn = self.get_db_conn()
             self.database["user"].drop()
             col_user = self.database["user"]
-            #col_user.delete_many({})
             col_user.create_index([("user_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS user ("
@@ -25,7 +26,6 @@ class Store:
             # )
             self.database["user_store"].drop()
             col_user_store = self.database["user_store"]
-            #col_user_store.delete_many({})
             col_user_store.create_index([("user_id", 1), ("store_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS user_store("
@@ -33,7 +33,6 @@ class Store:
             # )
             self.database["store"].drop()
             col_store = self.database["store"]
-            #col_store.delete_many({})
             col_store.create_index([("store_id", 1), ("book_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS store( "
@@ -42,23 +41,42 @@ class Store:
             # )
             self.database["new_order"].drop()
             col_new_order = self.database["new_order"]
-            #col_new_order.delete_many({})
             col_new_order.create_index([("order_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS new_order( "
-            #     "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT)"
+            #     "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT,"
+            #     "state TEXT DEFAULT 'wait for payment',"
+            #     "order_datetime TEXT)"
             # )
             self.database["new_order_detail"].drop()
             col_new_order_detail = self.database["new_order_detail"]
-            #col_new_order_detail.delete_many({})
             col_new_order_detail.create_index([("order_id", 1), ("book_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS new_order_detail( "
             #     "order_id TEXT, book_id TEXT, count INTEGER, price INTEGER,  "
             #     "PRIMARY KEY(order_id, book_id))"
             # )
-        except:
-            logging.error("initialize tables failed!")
+            self.database["his_order"].drop()
+            col_his_order = self.database["his_order"]
+            col_his_order.create_index([("order_id", 1)], unique=True)
+            # conn.execute(
+            #     "CREATE TABLE IF NOT EXISTS history_order( "
+            #     "order_id TEXT PRIMARY KEY, user_id TEXT, store_id TEXT, "
+            #     "state TEXT DEFAULT 'wait for payment', "
+            #     "order_datetime TEXT)"
+            # )
+            self.database["history_order_detail"].drop()
+            self.database["his_order_detail"].drop()
+            col_his_order_detail = self.database["his_order_detail"]
+            col_his_order_detail.create_index([("order_id", 1), ("book_id", 1)], unique=True)
+            # conn.execute(
+            #     "CREATE TABLE IF NOT EXISTS history_order_detail( "
+            #     "order_id TEXT, book_id TEXT, count INTEGER, price INTEGER,  "
+            #     "PRIMARY KEY(order_id, book_id))"
+            # )            
+            
+        except mongo_error.PyMongoError as e:
+            logging.error(e)
 
 
     def get_db_conn(self):
