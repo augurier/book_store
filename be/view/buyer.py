@@ -40,3 +40,37 @@ def add_funds():
     b = Buyer()
     code, message = b.add_funds(user_id, password, add_value)
     return jsonify({"message": message}), code
+
+
+@bp_buyer.route("/cancel_order", methods=["POST"])
+def cancel_order():
+    user_id = request.json.get("user_id")
+    order_id = request.json.get("order_id")
+    b = Buyer()
+    code, message = b.cancel_order(user_id, order_id)
+    return jsonify({"message": message}), code
+
+
+@bp_buyer.route("/receive", methods=["POST"])
+def receive():
+    user_id = request.json.get("user_id")
+    order_id = request.json.get("order_id")
+    b = Buyer()
+    code, message = b.receive(user_id, order_id)
+    return jsonify({"message": message}), code
+
+@bp_buyer.route("/search", methods=["POST"])
+def search():
+    keyword=request.json.get("keyword")
+    content=request.json.get("content")
+    store_id=request.json.get("store_id")
+    b=Buyer()
+    code,message,bids=b.search(keyword,content,store_id)
+    return jsonify({'message':message,'bids':bids}),code
+
+@bp_buyer.route("/history_order",methods=["POST"])
+def history_order():
+    user_id=request.json.get("user_id")
+    b=Buyer()
+    code,message,history_order=b.history_order(user_id)
+    return jsonify({'message':message,"history_order":history_order}),code

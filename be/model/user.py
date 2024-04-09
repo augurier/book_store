@@ -1,9 +1,9 @@
 import jwt
 import time
 import logging
-import sqlite3 as sqlite
 from be.model import error
 from be.model import db_conn
+import pymongo.errors as mongo_error
 
 # encode a json string like:
 #   {
@@ -57,58 +57,75 @@ class User(db_conn.DBConn):
         try:
             terminal = "terminal_{}".format(str(time.time()))
             token = jwt_encode(user_id, terminal)
-            self.conn.execute(
-                "INSERT into user(user_id, password, balance, token, terminal) "
-                "VALUES (?, ?, ?, ?, ?);",
-                (user_id, password, 0, token, terminal),
-            )
-            self.conn.commit()
-        except sqlite.Error:
+            
+            col_user = self.database["user"]
+            user1 = {
+                'user_id' : user_id,
+                'password' : password,
+                'balance' : 0,
+                'token' : token,
+                'terminal' : terminal
+            }
+            col_user.insert_one(user1)
+            # self.conn.execute(
+            #     "INSERT into user(user_id, password, balance, token, terminal) "
+            #     "VALUES (?, ?, ?, ?, ?);",
+            #     (user_id, password, 0, token, terminal),
+            # )
+        except:
             return error.error_exist_user_id(user_id)
         return 200, "ok"
 
-    def check_token(self, user_id: str, token: str) -> (int, str):
-        cursor = self.conn.execute("SELECT token from user where user_id=?", (user_id,))
-        row = cursor.fetchone()
+    def check_token(self, user_id: str, token: str) -> tuple[(int, str)]:
+        col_user = self.database["user"]
+        row = col_user.find_one({'user_id': user_id}, {'_id': 0, 'token': 1})
+        # cursor = self.conn.execute("SELECT token from user where user_id=?", (user_id,))
+        # row = cursor.fetchone()
         if row is None:
             return error.error_authorization_fail()
-        db_token = row[0]
+        db_token = row['token']
         if not self.__check_token(user_id, db_token, token):
             return error.error_authorization_fail()
         return 200, "ok"
 
-    def check_password(self, user_id: str, password: str) -> (int, str):
-        cursor = self.conn.execute(
-            "SELECT password from user where user_id=?", (user_id,)
-        )
-        row = cursor.fetchone()
+    def check_password(self, user_id: str, password: str) -> tuple[(int, str)]:
+        col_user = self.database["user"]
+        row = col_user.find_one({'user_id': user_id}, {'_id': 0, 'password': 1})
+        # cursor = self.conn.execute(
+        #     "SELECT password from user where user_id=?", (user_id,)
+        # )
+        # row = cursor.fetchone()
         if row is None:
             return error.error_authorization_fail()
 
-        if password != row[0]:
+        if password != row['password']:
             return error.error_authorization_fail()
 
         return 200, "ok"
 
-    def login(self, user_id: str, password: str, terminal: str) -> (int, str, str):
+    def login(self, user_id: str, password: str, terminal: str) -> tuple[(int, str, str)]:
         token = ""
         try:
             code, message = self.check_password(user_id, password)
+            
             if code != 200:
                 return code, message, ""
+            token = jwt_encode(user_id, terminal)            
 
-            token = jwt_encode(user_id, terminal)
-            cursor = self.conn.execute(
-                "UPDATE user set token= ? , terminal = ? where user_id = ?",
-                (token, terminal, user_id),
-            )
-            if cursor.rowcount == 0:
+            
+            col_user = self.database["user"]
+            rows = col_user.update_one({'user_id': user_id}, {'$set': {'token': token, 'terminal': terminal}})
+            # cursor = self.conn.execute(
+            #     "UPDATE user set token= ? , terminal = ? where user_id = ?",
+            #     (token, terminal, user_id),
+            # )
+            if rows.matched_count != 1:
                 return error.error_authorization_fail() + ("",)
-            self.conn.commit()
-        except sqlite.Error as e:
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e)), ""
         except BaseException as e:
             return 530, "{}".format(str(e)), ""
+
         return 200, "ok", token
 
     def logout(self, user_id: str, token: str) -> bool:
@@ -120,35 +137,39 @@ class User(db_conn.DBConn):
             terminal = "terminal_{}".format(str(time.time()))
             dummy_token = jwt_encode(user_id, terminal)
 
-            cursor = self.conn.execute(
-                "UPDATE user SET token = ?, terminal = ? WHERE user_id=?",
-                (dummy_token, terminal, user_id),
-            )
-            if cursor.rowcount == 0:
+            col_user = self.database["user"]
+            rows = col_user.update_one({'user_id': user_id}, {'$set': {'token': dummy_token, 'terminal': terminal}})
+            # cursor = self.conn.execute(
+            #     "UPDATE user SET token = ?, terminal = ? WHERE user_id=?",
+            #     (dummy_token, terminal, user_id),
+            # )
+            if rows.matched_count != 1:
                 return error.error_authorization_fail()
 
-            self.conn.commit()
-        except sqlite.Error as e:
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+
         return 200, "ok"
 
-    def unregister(self, user_id: str, password: str) -> (int, str):
+    def unregister(self, user_id: str, password: str) -> tuple[(int, str)]:
         try:
             code, message = self.check_password(user_id, password)
             if code != 200:
                 return code, message
 
-            cursor = self.conn.execute("DELETE from user where user_id=?", (user_id,))
-            if cursor.rowcount == 1:
-                self.conn.commit()
-            else:
+            col_user = self.database["user"]
+            rows = col_user.delete_many({'user_id': user_id})
+            #cursor = self.conn.execute("DELETE from user where user_id=?", (user_id,))
+            if rows.deleted_count != 1:
                 return error.error_authorization_fail()
-        except sqlite.Error as e:
+            
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+
         return 200, "ok"
 
     def change_password(
@@ -161,16 +182,19 @@ class User(db_conn.DBConn):
 
             terminal = "terminal_{}".format(str(time.time()))
             token = jwt_encode(user_id, terminal)
-            cursor = self.conn.execute(
-                "UPDATE user set password = ?, token= ? , terminal = ? where user_id = ?",
-                (new_password, token, terminal, user_id),
-            )
-            if cursor.rowcount == 0:
+            
+            col_user = self.database["user"]
+            rows = col_user.update_one({'user_id': user_id}, {'$set': {'password': new_password, 'token': token, 'terminal': terminal}})
+            # cursor = self.conn.execute(
+            #     "UPDATE user set password = ?, token= ? , terminal = ? where user_id = ?",
+            #     (new_password, token, terminal, user_id),
+            # )
+            if rows.matched_count != 1:
                 return error.error_authorization_fail()
-
-            self.conn.commit()
-        except sqlite.Error as e:
+            
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+
         return 200, "ok"

@@ -1,9 +1,11 @@
-import sqlite3 as sqlite
+import time
+import pymongo.errors as mongo_error
 import uuid
 import json
 import logging
 from be.model import db_conn
 from be.model import error
+from be.model import order_handle
 
 
 class Buyer(db_conn.DBConn):
@@ -11,8 +13,8 @@ class Buyer(db_conn.DBConn):
         db_conn.DBConn.__init__(self)
 
     def new_order(
-        self, user_id: str, store_id: str, id_and_count: [(str, int)]
-    ) -> (int, str, str):
+        self, user_id: str, store_id: str, id_and_count: tuple[(str, int)]
+    ) -> tuple[(int, str, str)]:
         order_id = ""
         try:
             if not self.user_id_exist(user_id):
@@ -21,169 +23,283 @@ class Buyer(db_conn.DBConn):
                 return error.error_non_exist_store_id(store_id) + (order_id,)
             uid = "{}_{}_{}".format(user_id, store_id, str(uuid.uuid1()))
 
+            col_store = self.database['store']
+            col_new_order_detail = self.database['new_order_detail']
+            col_new_order = self.database['new_order']
+
+            
             for book_id, count in id_and_count:
-                cursor = self.conn.execute(
-                    "SELECT book_id, stock_level, book_info FROM store "
-                    "WHERE store_id = ? AND book_id = ?;",
-                    (store_id, book_id),
-                )
-                row = cursor.fetchone()
+                row = col_store.find_one({'store_id': store_id, 'book_id': book_id},
+                                     {'_id': 0, 'book_id': 1, 'stock_level': 1, 'book_info': 1})
                 if row is None:
                     return error.error_non_exist_book_id(book_id) + (order_id,)
 
-                stock_level = row[1]
-                book_info = row[2]
+                stock_level = row['stock_level']
+                book_info = row['book_info']
                 book_info_json = json.loads(book_info)
                 price = book_info_json.get("price")
 
                 if stock_level < count:
                     return error.error_stock_level_low(book_id) + (order_id,)
-
-                cursor = self.conn.execute(
-                    "UPDATE store set stock_level = stock_level - ? "
-                    "WHERE store_id = ? and book_id = ? and stock_level >= ?; ",
-                    (count, store_id, book_id, count),
-                )
-                if cursor.rowcount == 0:
+                
+                rows = col_store.update_one({'store_id': store_id, 'book_id': book_id, 'stock_level': {'$gte': count}}, 
+                                           {'$inc': {'stock_level': -1}})
+                if rows.matched_count != 1:
                     return error.error_stock_level_low(book_id) + (order_id,)
 
-                self.conn.execute(
-                    "INSERT INTO new_order_detail(order_id, book_id, count, price) "
-                    "VALUES(?, ?, ?, ?);",
-                    (uid, book_id, count, price),
-                )
+                detail1 = {
+                        'order_id' : uid,
+                        'book_id' : book_id,
+                        'count' : count,
+                        'price' : price
+                    }
+                col_new_order_detail.insert_one(detail1)
+            
+            cur_time = str(int(time.time())) #纪元以来的秒数
+            order1 = {
+                        'order_id' : uid,
+                        'store_id' : store_id,
+                        'user_id' : user_id,
+                        'state' : 'wait for payment',
+                        'order_datetime' : cur_time
+                    }
+            col_new_order.insert_one(order1)
 
-            self.conn.execute(
-                "INSERT INTO new_order(order_id, store_id, user_id) "
-                "VALUES(?, ?, ?);",
-                (uid, store_id, user_id),
-            )
-            self.conn.commit()
-            order_id = uid
-        except sqlite.Error as e:
-            logging.info("528, {}".format(str(e)))
+            order_id = uid          
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e)), ""
         except BaseException as e:
-            logging.info("530, {}".format(str(e)))
-            return 530, "{}".format(str(e)), ""
+            return 530, "{}".format(str(e)), ""  
 
         return 200, "ok", order_id
-
-    def payment(self, user_id: str, password: str, order_id: str) -> (int, str):
-        conn = self.conn
+    
+    #调用之前需要调用者保证order_id合法
+    def order_timeout(self,order_id:str) -> tuple[(int,str)]:
+        col_his_order = self.database["his_order"]
+        col_new_order = self.database["new_order"]
+        col_his_order_detail = self.database["his_order_detail"]
+        col_new_order_detail = self.database["new_order_detail"]
         try:
-            cursor = conn.execute(
-                "SELECT order_id, user_id, store_id FROM new_order WHERE order_id = ?",
-                (order_id,),
-            )
-            row = cursor.fetchone()
+            order_handle.new_to_his(col_new_order, col_his_order, order_id)
+            order_handle.set_order_state(col_his_order, order_id, 'cancelled', 'wait for payment')
+            order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id)
+
+        except mongo_error.PyMongoError as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        
+        return error.error_order_timeout(order_id)
+
+
+
+    def payment(self, user_id: str, password: str, order_id: str) -> tuple[(int, str)]:
+        try:
+            col_user = self.database["user"]
+            col_user_store = self.database["user_store"]
+            col_new_order = self.database["new_order"]
+            col_new_order_detail = self.database["new_order_detail"]            
+            col_his_order = self.database["his_order"]
+            col_his_order_detail = self.database["his_order_detail"]
+            
+            row = col_new_order.find_one({'order_id': order_id}, {'_id': 0, 'state': 0})
+
             if row is None:
                 return error.error_invalid_order_id(order_id)
 
-            order_id = row[0]
-            buyer_id = row[1]
-            store_id = row[2]
-
+            order_id = row['order_id']
+            buyer_id = row['user_id']
+            store_id = row['store_id']
+            order_datetime = int(row['order_datetime'])
+            
             if buyer_id != user_id:
                 return error.error_authorization_fail()
 
-            cursor = conn.execute(
-                "SELECT balance, password FROM user WHERE user_id = ?;", (buyer_id,)
-            )
-            row = cursor.fetchone()
+            timeout_limit = 1 #这里的超时时间设置为1秒，方便调试
+            if order_datetime + timeout_limit < int(time.time()):
+                return self.order_timeout(order_id)
+
+            row = col_user.find_one({'user_id': buyer_id}, {'_id': 0, 'balance': 1, 'password': 1})
             if row is None:
                 return error.error_non_exist_user_id(buyer_id)
-            balance = row[0]
-            if password != row[1]:
+            balance = row['balance']
+            if password != row['password']:
                 return error.error_authorization_fail()
 
-            cursor = conn.execute(
-                "SELECT store_id, user_id FROM user_store WHERE store_id = ?;",
-                (store_id,),
-            )
-            row = cursor.fetchone()
+            row = col_user_store.find_one({'store_id': store_id}, 
+                                          {'_id': 0, 'store_id': 1, 'user_id': 1})
             if row is None:
                 return error.error_non_exist_store_id(store_id)
-
-            seller_id = row[1]
-
+            seller_id = row['user_id']
             if not self.user_id_exist(seller_id):
                 return error.error_non_exist_user_id(seller_id)
 
-            cursor = conn.execute(
-                "SELECT book_id, count, price FROM new_order_detail WHERE order_id = ?;",
-                (order_id,),
-            )
+            rows = col_new_order_detail.find({'order_id': order_id}, 
+                                             {'_id': 0, 'book_id': 1, 'count': 1, 'price': 1})
             total_price = 0
-            for row in cursor:
-                count = row[1]
-                price = row[2]
+            for row in rows:
+                count = row['count']
+                price = row['price']
                 total_price = total_price + price * count
-
             if balance < total_price:
                 return error.error_not_sufficient_funds(order_id)
 
-            cursor = conn.execute(
-                "UPDATE user set balance = balance - ?"
-                "WHERE user_id = ? AND balance >= ?",
-                (total_price, buyer_id, total_price),
-            )
-            if cursor.rowcount == 0:
+            rows = col_user.update_one({'user_id': buyer_id, 'balance': {'$gte': total_price}}, 
+                                           {'$inc': {'balance': -total_price}})
+            if rows.matched_count != 1:
                 return error.error_not_sufficient_funds(order_id)
-
-            cursor = conn.execute(
-                "UPDATE user set balance = balance + ?" "WHERE user_id = ?",
-                (total_price, seller_id),
-            )
-
-            if cursor.rowcount == 0:
+            
+            rows = col_user.update_one({'user_id': seller_id}, {'$inc': {'balance': total_price}})
+            if rows.matched_count != 1:
                 return error.error_non_exist_user_id(seller_id)
 
-            cursor = conn.execute(
-                "DELETE FROM new_order WHERE order_id = ?", (order_id,)
-            )
-            if cursor.rowcount == 0:
+            # order从new_order中删除并插入history_order中
+            # 更新state为等待发货
+            if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
+                return error.error_invalid_order_id(order_id)            
+            if not order_handle.set_order_state(col_his_order, order_id, 'wait for delivery'):
                 return error.error_invalid_order_id(order_id)
 
-            cursor = conn.execute(
-                "DELETE FROM new_order_detail where order_id = ?", (order_id,)
-            )
-            if cursor.rowcount == 0:
+            # order_detail从new_order_detail中删除并插入history_order_detail中
+            if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
                 return error.error_invalid_order_id(order_id)
 
-            conn.commit()
-
-        except sqlite.Error as e:
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
-
         except BaseException as e:
             return 530, "{}".format(str(e))
 
+
         return 200, "ok"
 
-    def add_funds(self, user_id, password, add_value) -> (int, str):
+    def add_funds(self, user_id, password, add_value) -> tuple[(int, str)]:
         try:
-            cursor = self.conn.execute(
-                "SELECT password  from user where user_id=?", (user_id,)
-            )
-            row = cursor.fetchone()
+            col_user = self.database["user"]
+            row = col_user.find_one({'user_id': user_id}, {'_id': 0, 'password': 1})
             if row is None:
                 return error.error_authorization_fail()
-
-            if row[0] != password:
+            if row['password'] != password:
                 return error.error_authorization_fail()
 
-            cursor = self.conn.execute(
-                "UPDATE user SET balance = balance + ? WHERE user_id = ?",
-                (add_value, user_id),
-            )
-            if cursor.rowcount == 0:
+            rows = col_user.update_one({'user_id': user_id}, {'$inc': {'balance': add_value}})
+            if rows.matched_count != 1:
                 return error.error_non_exist_user_id(user_id)
-
-            self.conn.commit()
-        except sqlite.Error as e:
+            
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
 
         return 200, "ok"
+
+    def cancel_order(self, user_id: str, order_id: str) -> tuple[int, str]:
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+                       
+            col_new_order = self.database["new_order"]
+            col_new_order_detail = self.database["new_order_detail"]            
+            col_his_order = self.database["his_order"]
+            col_his_order_detail = self.database["his_order_detail"]
+
+            #修改state状态，并将其从new_order移到history_order
+            if not order_handle.set_order_state(col_new_order, order_id, 'cancelled', 'wait for payment'):
+                return error.error_invalid_order_id(order_id)
+            if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
+                return error.error_invalid_order_id(order_id)
+            
+            #将new_order_detail做出相应的改动
+            if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
+                return error.error_invalid_order_id(order_id)
+
+        except mongo_error.PyMongoError as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+                
+        return 200, "ok"
+
+    def receive(self, user_id: str, order_id: str) -> tuple[(int,str)]:
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+
+            col_his_order = self.database["his_order"]
+            if not order_handle.set_order_state(col_his_order, order_id, 'received', 'delivering'):
+                return error.error_invalid_order_id(order_id)
+
+        except mongo_error.PyMongoError as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200, "ok"
+    
+    #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
+    def search(self, keyword:str, content:str, store_id:str) -> tuple[(int, str, list[str])]:
+        try:    
+            col_store = self.database["store"]
+            keys = self.col_book.find_one().keys()
+            if keyword not in keys or keyword == '_id':
+                return error.error_wrong_keyword(keyword)+([],)
+                
+            if store_id == '':
+                target_store = {}
+            else:
+                if not self.store_id_exist(store_id):
+                    return error.error_non_exist_store_id(store_id)+([],)  
+                              
+                target_store = {'store_id': store_id}
+                
+            rows = col_store.find(target_store, {'_id': 0, 'book_id': 1})
+            bids = tuple(row['book_id'] for row in rows)
+
+            rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
+                               {'_id': 0, 'id': 1})
+            res = [row['id'] for row in rows]
+
+        except mongo_error.PyMongoError as e:
+            return 528, "{}".format(str(e)),[]
+        except BaseException as e:
+            return 530, "{}".format(str(e)),[]
+        
+        return 200,"ok",res
+
+
+    def history_order(self, user_id:str) -> tuple[int, str, list[any]]:
+        '''return order_id,store_id,state,order_datetime,book_id,count,price''' 
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)+([],)
+                    
+            col_his_order = self.database["his_order"]
+            
+            match1 = {'$match': {'user_id': user_id}}
+            look_up1 = {'$lookup': {'from': 'his_order_detail', 
+                                   'localField': 'order_id', 
+                                   'foreignField': 'order_id', 
+                                   'as': 'order_detail'}} 
+            look_up2 = {'$lookup':{'from': 'store',
+                                   'localField': 'store_id',
+                                   'foreignField': 'store_id',
+                                   'as': 'store_item'}}
+            project = {'$project': {'_id': 0, 'order_id': 1, 'store_id': 1, 'state': 1, 'order_datetime': 1,
+                                    'book_id': '$order_detail.book_id', 'count': '$order_detail.count', 'price': '$order_detail.price',
+                                    'difference': {'$eq': ['$order_detail.book_id', '$store_item.book_id']}}}
+            match2 = {'$match': {'difference': True}}
+            rows = col_his_order.aggregate([match1, look_up1, look_up2, project, match2])   
+            res = [[row['order_id'], row['store_id'], row['state'], row['order_datetime'], row['book_id'], row['count'], row['price']] for row in rows]        
+            # sql="""
+            #     select A.order_id,A.store_id,state,order_datetime,B.book_id,count,price 
+            #     from history_order as A 
+            #     join history_order_detail as B on A.order_id=B.order_id
+            #     join store as C on A.store_id=C.store_id and B.book_id=C.book_id
+            #     where user_id='{}'""".format(user_id)
+            
+        except mongo_error.PyMongoError as e:
+            logging.error(str(e))
+            return 528, "{}".format(str(e)),[]
+        except BaseException as e:
+            logging.error(str(e))
+            return 530, "{}".format(str(e)),[]
+        
+        return 200,"ok",res
