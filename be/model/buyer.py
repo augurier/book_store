@@ -7,6 +7,7 @@ from be.model import db_conn
 from be.model import error
 from be.model import order_handle
 
+SEARCH_PAGE_LENGTH = 10
 
 class Buyer(db_conn.DBConn):
     def __init__(self):
@@ -235,18 +236,18 @@ class Buyer(db_conn.DBConn):
         return 200, "ok"
     
     #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
-    def search(self, keyword:str, content:str, store_id:str) -> tuple[(int, str, list[str])]:
+    def search(self, keyword:str, content:str, store_id:str) -> tuple[(int, str, list[str]), int]:
         try:    
             col_store = self.database["store"]
             keys = self.col_book.find_one().keys()
             if keyword not in keys or keyword == '_id':
-                return error.error_wrong_keyword(keyword)+([],)
+                return error.error_wrong_keyword(keyword)+([],-1,)
                 
             if store_id == '':
                 target_store = {}
             else:
                 if not self.store_id_exist(store_id):
-                    return error.error_non_exist_store_id(store_id)+([],)  
+                    return error.error_non_exist_store_id(store_id)+([],-1,)  
                               
                 target_store = {'store_id': store_id}
                 
@@ -256,14 +257,37 @@ class Buyer(db_conn.DBConn):
             rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
                                {'_id': 0, 'id': 1})
             res = [row['id'] for row in rows]
-
+            pages = len(res) // SEARCH_PAGE_LENGTH #结果共几页
+            
         except mongo_error.PyMongoError as e:
-            return 528, "{}".format(str(e)),[]
+            return 528, "{}".format(str(e)),[],-1
         except BaseException as e:
-            return 530, "{}".format(str(e)),[]
+            return 530, "{}".format(str(e)),[],-1
         
-        return 200,"ok",res
-
+        return 200,"ok",res,pages
+    
+    def next_page(self, bids: list[str], page_now: int, pages: int) -> tuple[int, str, list[str], int]:
+        next_page = page_now + 1
+        if next_page > pages:
+            return error.error_non_exist_page(next_page)+([],page_now,)
+        
+        res = bids[next_page * SEARCH_PAGE_LENGTH: (next_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,next_page
+    
+    def pre_page(self, bids: list[str], page_now: int) -> tuple[int, str, list[str], int]:
+        pre_page = page_now - 1
+        if pre_page < 0:
+            return error.error_non_exist_page(pre_page)+([],page_now,)
+        
+        res = bids[pre_page * SEARCH_PAGE_LENGTH: (pre_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,pre_page
+    
+    def specific_page(self, bids: list[str], page_now: int, target_page: int, pages: int) -> tuple[int, str, list[str], int]:
+        if target_page > pages or target_page < 0:
+            return error.error_non_exist_page(target_page)+([],page_now,)
+        
+        res = bids[target_page * SEARCH_PAGE_LENGTH: (target_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,target_page
 
     def history_order(self, user_id:str) -> tuple[int, str, list[any]]:
         '''return order_id,store_id,state,order_datetime,book_id,count,price''' 

@@ -69,7 +69,7 @@ class Buyer:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
 
-    def search(self,keyword,content,store_id="")->tuple[int,list[str]]:
+    def search(self,keyword,content,store_id="")->tuple[int,list[str],int]:
         json={
             "keyword":keyword,
             "content":content,
@@ -80,8 +80,52 @@ class Buyer:
         r=requests.post(url,headers=headers,json=json)
         response_json=r.json()
         bids_json=response_json.get("bids")
-        return r.status_code,bids_json
+        pages_json=response_json.get("pages")
+        return r.status_code,bids_json,pages_json
 
+    def next_page(self, bids: list[str], page_now: int, pages: int) -> tuple[int, str, list[str], int]:
+        json={
+            "bids":bids,
+            "page_now":page_now,
+            "pages":pages,
+        }
+        url=urljoin(self.url_prefix,"next_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+
+    def pre_page(self, bids: list[str], page_now: int) -> tuple[int, str, list[str], int]:
+        json={
+            "bids":bids,
+            "page_now":page_now,
+        }
+        url=urljoin(self.url_prefix,"pre_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+    
+    def specific_page(self, bids: list[str], page_now: int, target_page: int, pages: int) -> tuple[int, str, list[str], int]:
+        json={
+            "bids":bids,
+            "page_now":page_now,
+            "target_page":target_page,
+            "pages":pages,
+        }
+        url=urljoin(self.url_prefix,"specific_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+    
+    
     def history_order(self)->tuple[int,list[any]]:
         json={
             "user_id":self.user_id,
