@@ -11,7 +11,7 @@ error_code = {
     519: "not sufficient funds, order id {}",
     520: "order time out, order id {}",
     521: "wrong keyword {}",
-    522: "",
+    522: "non exist page {}",
     523: "",
     524: "",
     525: "",
@@ -62,6 +62,9 @@ def error_order_timeout(order_id):
 
 def error_wrong_keyword(keyword):
     return 521, error_code[521].format(keyword)
+
+def error_non_exist_page(page):
+    return 522, error_code[522].format(page)
 
 def error_authorization_fail():
     return 401, error_code[401]
