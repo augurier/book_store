@@ -1,7 +1,8 @@
-import sqlite3 as sqlite
+import pymongo.errors as mongo_error
 from be.model import error
 from be.model import db_conn
-import json
+from be.model import order_handle
+
 
 class Seller(db_conn.DBConn):
     def __init__(self):
@@ -23,22 +24,21 @@ class Seller(db_conn.DBConn):
             if self.book_id_exist(store_id, book_id):
                 return error.error_exist_book_id(book_id)
 
-            self.conn.execute(
-                "INSERT into store(store_id, book_id, book_info, stock_level)"
-                "VALUES (?, ?, ?, ?)",
-                (store_id, book_id, book_json_str, stock_level),
-            )
+            col_store = self.database["store"]
+            store1 = {
+                'store_id' : store_id,
+                'book_id' : book_id,
+                'book_info' : book_json_str,
+                'stock_level' : stock_level
+            }
+            col_store.insert_one(store1)
 
-            # decoder=json.JSONDecoder()
-            # book_info=decoder.decode(book_json_str)
-            # self.book_conn.execute(
-            #     """INSERT INTO book """
-            # )
-            self.conn.commit()
-        except sqlite.Error as e:
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+
+
         return 200, "ok"
 
     def add_stock_level(
@@ -52,16 +52,15 @@ class Seller(db_conn.DBConn):
             if not self.book_id_exist(store_id, book_id):
                 return error.error_non_exist_book_id(book_id)
 
-            self.conn.execute(
-                "UPDATE store SET stock_level = stock_level + ? "
-                "WHERE store_id = ? AND book_id = ?",
-                (add_stock_level, store_id, book_id),
-            )
-            self.conn.commit()
-        except sqlite.Error as e:
+            col_store = self.database["store"]
+            col_store.update_one({'store_id': store_id, 'book_id': book_id}, 
+                                 {'$inc': {'stock_level': add_stock_level}})
+            
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+        
         return 200, "ok"
 
     def create_store(self, user_id: str, store_id: str) -> tuple[(int, str)]:
@@ -70,32 +69,34 @@ class Seller(db_conn.DBConn):
                 return error.error_non_exist_user_id(user_id)
             if self.store_id_exist(store_id):
                 return error.error_exist_store_id(store_id)
-            self.conn.execute(
-                "INSERT into user_store(store_id, user_id)" "VALUES (?, ?)",
-                (store_id, user_id),
-            )
-            self.conn.commit()
-        except sqlite.Error as e:
+            
+            col_user_store = self.database["user_store"]
+            user_store1 = {
+                'store_id' : store_id,
+                'user_id' : user_id,
+            }
+            col_user_store.insert_one(user_store1)
+            
+        except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
+
         return 200, "ok"
 
     def deliver(self,user_id:str,order_id:str):
-        conn=self.conn
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
 
-            cursor=conn.execute("UPDATE history_order SET state='delivering' "
-                                "WHERE order_id=? AND state='wait for delivery'",
-                                (order_id,)
-                                )
-            if cursor.rowcount==0:
+            col_his_order = self.database["his_order"]
+
+            if not order_handle.set_order_state(col_his_order, order_id, 'delivering', 'wait for delivery'):
                 return error.error_invalid_order_id(order_id)
-            conn.commit()
-        except sqlite.Error as e:
+            
+        except mongo_error.PyMongoError as e:
             return 528,"{}".format(str(e))
         except BaseException as e:
             return 530,"{}".format(str(e))
+        
         return 200,"ok"

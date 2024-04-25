@@ -49,7 +49,7 @@ class TestSearch:
         assert code == 200
         code=self.buyer.payment(self.order_id)
         assert code == 200
-        code,history_order=self.buyer.history_order()
+        code,history_order = self.buyer.history_order()
         assert code == 200
         logging.info(history_order)
         assert self.order_id in list(map(lambda x:x[0],history_order))
