@@ -69,25 +69,28 @@ class Buyer:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
 
-    def search(self,keyword,content,store_id="")->tuple[int,list[str],int]:
+    def search(self,keyword,content,store_id="",have_pic=True)->tuple[int,int]:
         json={
+            "user_id":self.user_id,
             "keyword":keyword,
             "content":content,
             "store_id":store_id,
+            "have_pic":have_pic
         }
         url=urljoin(self.url_prefix,"search")
         headers={"token":self.token}
         r=requests.post(url,headers=headers,json=json)
         response_json=r.json()
-        bids_json=response_json.get("bids")
+        # bids_json=response_json.get("bids")
         pages_json=response_json.get("pages")
-        return r.status_code,bids_json,pages_json
+        return r.status_code,pages_json
 
-    def next_page(self, bids: list[str], page_now: int, pages: int) -> tuple[int, str, list[str], int]:
+    def next_page(self, page_now: int, pages: int,have_pic=True) -> tuple[int, str, list[str], int]:
         json={
-            "bids":bids,
+            "user_id":self.user_id,
             "page_now":page_now,
             "pages":pages,
+            "have_pic":have_pic
         }
         url=urljoin(self.url_prefix,"next_page")
         headers={"token":self.token}
@@ -97,10 +100,11 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
 
-    def pre_page(self, bids: list[str], page_now: int) -> tuple[int, str, list[str], int]:
+    def pre_page(self,  page_now: int,have_pic=True) -> tuple[int, str, list[str], int]:
         json={
-            "bids":bids,
+            "user_id":self.user_id,
             "page_now":page_now,
+            "have_pic":have_pic
         }
         url=urljoin(self.url_prefix,"pre_page")
         headers={"token":self.token}
@@ -110,12 +114,13 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
     
-    def specific_page(self, bids: list[str], page_now: int, target_page: int, pages: int) -> tuple[int, str, list[str], int]:
+    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=True) -> tuple[int, str, list[str], int]:
         json={
-            "bids":bids,
+            "user_id":self.user_id,
             "page_now":page_now,
             "target_page":target_page,
             "pages":pages,
+            "have_pic":have_pic
         }
         url=urljoin(self.url_prefix,"specific_page")
         headers={"token":self.token}

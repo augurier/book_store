@@ -46,52 +46,55 @@ class TestSearch:
 
     def test_ok(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('title',book.title)
-        assert code == 200
-        assert book.id in bids and pages == 0
+        code,pages=self.buyer.search('title',book.title)
+        assert code == 200 and pages == 0
+        # assert book.id in bids and pages == 0
     
     def test_not_in(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('title',book.title+"_x")
-        assert code == 200
-        assert len(bids) == 0 and pages == 0
+        code,pages=self.buyer.search('title',book.title+"_x")
+        assert code == 200 and pages == 0
+        # assert len(bids) == 0 and pages == 0
         
     def test_next_and_pre(self):
-        code,bids,pages=self.buyer.search('tags', '\n')
+        code,pages=self.buyer.search('tags', '\n')
         assert code == 200 and pages > 0
-        book_id = bids[0]
-        code,bids1,page=self.buyer.next_page(bids, 0, pages)
+        code,bids,page=self.buyer.specific_page(0,0,pages)
+        book=bids[0]
+        code,bids1,page=self.buyer.next_page( 0, pages)
         assert code == 200 and page == 1
-        code,bids0,page=self.buyer.pre_page(bids, 1)
-        assert code == 200 and page == 0 and book_id in bids0
+        code,bids0,page=self.buyer.pre_page( 1)
+        assert code == 200 and page == 0 and book in bids0
         
     def test_specific_page(self):
-        code,bids,pages=self.buyer.search('tags', '\n')
+        code,pages=self.buyer.search('tags', '\n')
         assert code == 200 and pages > 0
-        book_id = bids[0]
-        code,bids0,page=self.buyer.specific_page(bids, 0, 0,pages)
-        assert code == 200 and page == 0 and book_id in bids0
+        code,bids,page=self.buyer.specific_page(0,0,pages)
+        book=bids[0]
+        code,bids0,page=self.buyer.specific_page(0, 0,pages)
+        assert code == 200 and page == 0 and book in bids0
         
     def test_non_next_and_pre_and_specific(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('title',book.title)
-        assert code == 200 and book.id in bids and pages == 0
-        code,bids0,page=self.buyer.next_page(bids, 0, pages)
+        code,pages=self.buyer.search('title',book.title)
+        assert code == 200 and pages == 0
+        code,bids0,page=self.buyer.next_page(0, pages)
         assert code != 200
-        code,bids0,page=self.buyer.pre_page(bids, 0)
+        code,bids0,page=self.buyer.pre_page(0)
         assert code != 200
-        code,bids0,page=self.buyer.specific_page(bids, 0, 1,pages)
+        code,bids0,page=self.buyer.specific_page(0, 1,pages)
         assert code != 200
         
     def test_partial_name(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('title',book.title[0])
+        code,pages=self.buyer.search('title',book.title[0])
         assert code == 200
-        assert book.id in bids
+        code,bids,pages=self.buyer.specific_page(0,0,pages)
+        assert book.id in [row['id'] for row in bids]
 
     def test_wrong_keyword(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('wrong',book.title[0])
+        code,pages=self.buyer.search('wrong',book.title[0])
         assert code != 200
 
     def test_specific_store(self):
@@ -100,14 +103,17 @@ class TestSearch:
         book:Book=self.buy_book_info_list[0][0]
         gen_book=GenBook(seller_id,store_id)
         gen_book.gen(False,False,1)
-        code,bids,pages = self.buyer.search('title',book.title,store_id=self.store_id)
-        assert code == 200 and book.id in bids and pages == 0
-        code,bids,pages = self.buyer.search('title',book.title,store_id=store_id)
-        assert code == 200 and not book.id in bids and pages == 0
+        code,pages = self.buyer.search('title',book.title,store_id=self.store_id)
+        assert code == 200 and pages == 0
+        code,bids,pages=self.buyer.specific_page(0,0,pages)
+        assert book.id in [row['id'] for row in bids]
+        code,pages = self.buyer.search('title',book.title,store_id=store_id)
+        code,bids,pages=self.buyer.specific_page(0,0,pages)
+        assert code == 200 and not book.id in [row['id'] for row in bids] and pages == 0
 
     def test_wrong_store_id(self):
         book:Book=self.buy_book_info_list[0][0]
-        code,bids,pages=self.buyer.search('title',book.title,store_id=self.store_id+'_x')
+        code,pages=self.buyer.search('title',book.title,store_id=self.store_id+'_x')
         assert code != 200
 
     def test_zero_stock(self):
@@ -116,5 +122,7 @@ class TestSearch:
         password=seller_id
         seller=register_new_seller(seller_id,password)
         seller.create_store(store_id)
-        code,bids,pages=self.buyer.search('title','abc',store_id=store_id)
-        assert code == 200 and bids == [] and pages == 0
+        code,pages=self.buyer.search('title','abc',store_id=store_id)
+        assert code == 200 and pages == 0
+        code,bids,pages=self.buyer.specific_page(0,0,pages)
+        assert bids==[]

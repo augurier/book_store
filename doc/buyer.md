@@ -142,3 +142,17 @@ Status Code:
 200 | 充值成功
 401 | 授权失败
 5XX | 无效参数
+
+## 买家取消订单
+
+#### URL:
+POST http://[address]/buyer/cancel_order
+
+#### Request
+
+##### Body:
+```json
+{
+  
+}
+```

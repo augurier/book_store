@@ -30,7 +30,9 @@ def be_run():
     log_file = os.path.join(parent_path, "app.log")
     init_database(parent_path)
 
-    logging.basicConfig(filename=log_file, level=logging.ERROR)
+    logging.basicConfig(filename=log_file, level=logging.INFO)
+    logging.getLogger('werkzeug').setLevel(logging.ERROR) #减少werkzeug控制台输出
+    
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
         "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s"

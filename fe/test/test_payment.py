@@ -6,14 +6,14 @@ from fe.test.gen_book_data import GenBook
 from fe.access.new_buyer import register_new_buyer
 from fe.access.book import Book
 import uuid
-
+import time
 
 class TestPayment:
     seller_id: str
     store_id: str
     buyer_id: str
     password: str
-    buy_book_info_list: [Book]
+    buy_book_info_list: list[Book]
     total_price: int
     order_id: str
     buyer: Buyer

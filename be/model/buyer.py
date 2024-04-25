@@ -56,7 +56,7 @@ class Buyer(db_conn.DBConn):
                     }
                 col_new_order_detail.insert_one(detail1)
             
-            cur_time = str(int(time.time())) #纪元以来的秒数
+            cur_time = str(int(time.time())) #?????????????
             order1 = {
                         'order_id' : uid,
                         'store_id' : store_id,
@@ -74,7 +74,7 @@ class Buyer(db_conn.DBConn):
 
         return 200, "ok", order_id
     
-    #调用之前需要调用者保证order_id合法
+    #?????????????????order_id???
     def order_timeout(self,order_id:str) -> tuple[(int,str)]:
         col_his_order = self.database["his_order"]
         col_new_order = self.database["new_order"]
@@ -116,7 +116,7 @@ class Buyer(db_conn.DBConn):
             if buyer_id != user_id:
                 return error.error_authorization_fail()
 
-            timeout_limit = 1 #这里的超时时间设置为1秒，方便调试
+            timeout_limit = 1 #???????????????1?????????
             if order_datetime + timeout_limit < int(time.time()):
                 return self.order_timeout(order_id)
 
@@ -154,14 +154,14 @@ class Buyer(db_conn.DBConn):
             if rows.matched_count != 1:
                 return error.error_non_exist_user_id(seller_id)
 
-            # order从new_order中删除并插入history_order中
-            # 更新state为等待发货
+            # order??new_order???????????history_order??
+            # ????state????????
             if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
                 return error.error_invalid_order_id(order_id)            
             if not order_handle.set_order_state(col_his_order, order_id, 'wait for delivery'):
                 return error.error_invalid_order_id(order_id)
 
-            # order_detail从new_order_detail中删除并插入history_order_detail中
+            # order_detail??new_order_detail???????????history_order_detail??
             if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
                 return error.error_invalid_order_id(order_id)
 
@@ -203,13 +203,13 @@ class Buyer(db_conn.DBConn):
             col_his_order = self.database["his_order"]
             col_his_order_detail = self.database["his_order_detail"]
 
-            #修改state状态，并将其从new_order移到history_order
+            #???state???????????new_order???history_order
             if not order_handle.set_order_state(col_new_order, order_id, 'cancelled', 'wait for payment'):
                 return error.error_invalid_order_id(order_id)
             if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
                 return error.error_invalid_order_id(order_id)
             
-            #将new_order_detail做出相应的改动
+            #??new_order_detail???????????
             if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
                 return error.error_invalid_order_id(order_id)
 
@@ -235,7 +235,7 @@ class Buyer(db_conn.DBConn):
             return 530, "{}".format(str(e))
         return 200, "ok"
     
-    #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
+    #???store_id??????????????????????????????store????
     def search(self, user_id:str, keyword:str, content:str, store_id:str) -> tuple[int, str, int]:
         try:    
             col_store = self.database["store"]
@@ -261,7 +261,7 @@ class Buyer(db_conn.DBConn):
             col_user = self.database["user"]
             rows = col_user.update_one({'user_id': user_id}, {'$set': {'bids': res}})
             
-            pages = len(res) // SEARCH_PAGE_LENGTH #结果共几页
+            pages = len(res) // SEARCH_PAGE_LENGTH #????????
             
         except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e)),-1
@@ -272,6 +272,7 @@ class Buyer(db_conn.DBConn):
     
     def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
         res = []
+        # have_pic=False
         if have_pic:
             content = {'_id': 0}
         else:
@@ -284,6 +285,9 @@ class Buyer(db_conn.DBConn):
         col_book = self.col_book
         rows = col_book.find({'id': {'$in': bids}}, content)
         res = [row for row in rows]  
+        if have_pic:
+            for row in res:
+                row['picture']=str(row['picture'])
         return res
     
     def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:

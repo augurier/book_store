@@ -28,7 +28,7 @@ mydb = myclient["bookstore_db"]
 mycol = mydb["book"]
 mycol.delete_many({})
 mycol.create_index([("id", 1)], unique=True)
-cursor = get_book_cursor(0, 15)
+cursor = get_book_cursor(0, 69)
 booklist = []
 for row in cursor:
     book = {
