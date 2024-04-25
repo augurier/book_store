@@ -272,6 +272,7 @@ class Buyer(db_conn.DBConn):
     
     def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
         res = []
+        # have_pic=False
         if have_pic:
             content = {'_id': 0}
         else:
@@ -284,6 +285,9 @@ class Buyer(db_conn.DBConn):
         col_book = self.col_book
         rows = col_book.find({'id': {'$in': bids}}, content)
         res = [row for row in rows]  
+        if have_pic:
+            for row in res:
+                row['picture']=str(row['picture'])
         return res
     
     def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
