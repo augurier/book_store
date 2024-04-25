@@ -236,18 +236,18 @@ class Buyer(db_conn.DBConn):
         return 200, "ok"
     
     #???store_id??????????????????????????????store????
-    def search(self, keyword:str, content:str, store_id:str) -> tuple[(int, str, list[str]), int]:
+    def search(self, user_id:str, keyword:str, content:str, store_id:str) -> tuple[int, str, int]:
         try:    
             col_store = self.database["store"]
             keys = self.col_book.find_one().keys()
             if keyword not in keys or keyword == '_id':
-                return error.error_wrong_keyword(keyword)+([],-1,)
+                return error.error_wrong_keyword(keyword)+(-1,)
                 
             if store_id == '':
                 target_store = {}
             else:
                 if not self.store_id_exist(store_id):
-                    return error.error_non_exist_store_id(store_id)+([],-1,)  
+                    return error.error_non_exist_store_id(store_id)+(-1,)  
                               
                 target_store = {'store_id': store_id}
                 
@@ -257,35 +257,58 @@ class Buyer(db_conn.DBConn):
             rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
                                {'_id': 0, 'id': 1})
             res = [row['id'] for row in rows]
+            
+            col_user = self.database["user"]
+            rows = col_user.update_one({'user_id': user_id}, {'$set': {'bids': res}})
+            
             pages = len(res) // SEARCH_PAGE_LENGTH #????????
             
         except mongo_error.PyMongoError as e:
-            return 528, "{}".format(str(e)),[],-1
+            return 528, "{}".format(str(e)),-1
         except BaseException as e:
-            return 530, "{}".format(str(e)),[],-1
+            return 530, "{}".format(str(e)),-1
         
-        return 200,"ok",res,pages
+        return 200,"ok",pages
     
-    def next_page(self, bids: list[str], page_now: int, pages: int) -> tuple[int, str, list[str], int]:
+    def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
+        res = []
+        if have_pic:
+            content = {'_id': 0}
+        else:
+            content = {'_id': 0, 'picture': 0}
+        
+        col_user = self.database["user"]
+        row = col_user.find_one({'user_id': user_id}, {'bids': 1})   
+        bids = row["bids"] 
+        
+        col_book = self.col_book
+        rows = col_book.find({'id': {'$in': bids}}, content)
+        res = [row for row in rows]  
+        return res
+    
+    def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
         next_page = page_now + 1
         if next_page > pages:
             return error.error_non_exist_page(next_page)+([],page_now,)
         
+        bids = self.get_book_from_bid(user_id, have_pic)
         res = bids[next_page * SEARCH_PAGE_LENGTH: (next_page+1) * SEARCH_PAGE_LENGTH:]
         return 200,"ok",res,next_page
     
-    def pre_page(self, bids: list[str], page_now: int) -> tuple[int, str, list[str], int]:
+    def pre_page(self, user_id: str, page_now: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
         pre_page = page_now - 1
         if pre_page < 0:
             return error.error_non_exist_page(pre_page)+([],page_now,)
         
+        bids = self.get_book_from_bid(user_id, have_pic)
         res = bids[pre_page * SEARCH_PAGE_LENGTH: (pre_page+1) * SEARCH_PAGE_LENGTH:]
         return 200,"ok",res,pre_page
     
-    def specific_page(self, bids: list[str], page_now: int, target_page: int, pages: int) -> tuple[int, str, list[str], int]:
+    def specific_page(self, user_id: str, page_now: int, target_page: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
         if target_page > pages or target_page < 0:
             return error.error_non_exist_page(target_page)+([],page_now,)
         
+        bids = self.get_book_from_bid(user_id, have_pic)
         res = bids[target_page * SEARCH_PAGE_LENGTH: (target_page+1) * SEARCH_PAGE_LENGTH:]
         return 200,"ok",res,target_page
 

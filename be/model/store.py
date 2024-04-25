@@ -22,7 +22,7 @@ class Store:
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS user ("
             #     "user_id TEXT PRIMARY KEY, password TEXT NOT NULL, "
-            #     "balance INTEGER NOT NULL, token TEXT, terminal TEXT);"
+            #     "balance INTEGER NOT NULL, token TEXT, terminal TEXT, bids []);"
             # )
             self.database["user_store"].drop()
             col_user_store = self.database["user_store"]
@@ -30,7 +30,7 @@ class Store:
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS user_store("
             #     "user_id TEXT, store_id, PRIMARY KEY(user_id, store_id));"
-            # )
+            # )       
             self.database["store"].drop()
             col_store = self.database["store"]
             col_store.create_index([("store_id", 1), ("book_id", 1)], unique=True)

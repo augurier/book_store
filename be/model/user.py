@@ -64,7 +64,8 @@ class User(db_conn.DBConn):
                 'password' : password,
                 'balance' : 0,
                 'token' : token,
-                'terminal' : terminal
+                'terminal' : terminal,
+                'bids' : []
             }
             col_user.insert_one(user1)
             # self.conn.execute(
