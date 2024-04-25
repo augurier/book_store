@@ -6,6 +6,14 @@ import logging
 from fe.bench.workload import Workload
 from fe.bench.session import Session
 
+import threading
+from be import serve
+from be.model.store import init_completed_event
+from urllib.parse import urljoin
+from fe import conf
+import requests
+thread:threading.Thread = None
+
 logging.basicConfig(filename='bench.log',level=logging.INFO)
 
 def run_bench():
@@ -25,5 +33,14 @@ def run_bench():
 
 
 if __name__ == "__main__":
+    # global thread
+    thread = threading.Thread(target=serve.be_run)
+    thread.start()
+    init_completed_event.wait()
     logging.info("bench start")
     run_bench()
+    url=urljoin(conf.URL,"shutdown")
+    requests.get(url)
+    thread.join()
+
+

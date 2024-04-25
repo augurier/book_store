@@ -56,7 +56,7 @@ class Buyer(db_conn.DBConn):
                     }
                 col_new_order_detail.insert_one(detail1)
             
-            cur_time = str(int(time.time())) #��Ԫ����������
+            cur_time = str(int(time.time())) #?????????????
             order1 = {
                         'order_id' : uid,
                         'store_id' : store_id,
@@ -74,7 +74,7 @@ class Buyer(db_conn.DBConn):
 
         return 200, "ok", order_id
     
-    #����֮ǰ��Ҫ�����߱�֤order_id�Ϸ�
+    #?????????????????order_id???
     def order_timeout(self,order_id:str) -> tuple[(int,str)]:
         col_his_order = self.database["his_order"]
         col_new_order = self.database["new_order"]
@@ -116,7 +116,7 @@ class Buyer(db_conn.DBConn):
             if buyer_id != user_id:
                 return error.error_authorization_fail()
 
-            timeout_limit = 1 #����ĳ�ʱʱ������Ϊ1�룬�������
+            timeout_limit = 1 #???????????????1?????????
             if order_datetime + timeout_limit < int(time.time()):
                 return self.order_timeout(order_id)
 
@@ -154,14 +154,14 @@ class Buyer(db_conn.DBConn):
             if rows.matched_count != 1:
                 return error.error_non_exist_user_id(seller_id)
 
-            # order��new_order��ɾ��������history_order��
-            # ����stateΪ�ȴ�����
+            # order??new_order???????????history_order??
+            # ????state????????
             if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
                 return error.error_invalid_order_id(order_id)            
             if not order_handle.set_order_state(col_his_order, order_id, 'wait for delivery'):
                 return error.error_invalid_order_id(order_id)
 
-            # order_detail��new_order_detail��ɾ��������history_order_detail��
+            # order_detail??new_order_detail???????????history_order_detail??
             if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
                 return error.error_invalid_order_id(order_id)
 
@@ -203,13 +203,13 @@ class Buyer(db_conn.DBConn):
             col_his_order = self.database["his_order"]
             col_his_order_detail = self.database["his_order_detail"]
 
-            #�޸�state״̬���������new_order�Ƶ�history_order
+            #???state???????????new_order???history_order
             if not order_handle.set_order_state(col_new_order, order_id, 'cancelled', 'wait for payment'):
                 return error.error_invalid_order_id(order_id)
             if not order_handle.new_to_his(col_new_order, col_his_order, order_id):
                 return error.error_invalid_order_id(order_id)
             
-            #��new_order_detail������Ӧ�ĸĶ�
+            #??new_order_detail???????????
             if not order_handle.new_to_his(col_new_order_detail, col_his_order_detail, order_id):
                 return error.error_invalid_order_id(order_id)
 
@@ -235,7 +235,7 @@ class Buyer(db_conn.DBConn):
             return 530, "{}".format(str(e))
         return 200, "ok"
     
-    #���store_id�ǿ��ַ�������Ϊȫվ�������������ض�store����
+    #???store_id??????????????????????????????store????
     def search(self, keyword:str, content:str, store_id:str) -> tuple[(int, str, list[str]), int]:
         try:    
             col_store = self.database["store"]
@@ -257,7 +257,7 @@ class Buyer(db_conn.DBConn):
             rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
                                {'_id': 0, 'id': 1})
             res = [row['id'] for row in rows]
-            pages = len(res) // SEARCH_PAGE_LENGTH #�������ҳ
+            pages = len(res) // SEARCH_PAGE_LENGTH #????????
             
         except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e)),[],-1
