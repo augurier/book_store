@@ -19,7 +19,7 @@ class TestAddStockLevel:
         book_db = book.BookDB(conf.Use_Large_DB)
         self.books = book_db.get_book_info(0, 5)
         for bk in self.books:
-            code = self.seller.add_book(self.store_id, 0, bk)
+            code = self.seller.add_book(self.store_id, 0, bk.id)
             assert code == 200
         yield
 

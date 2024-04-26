@@ -15,7 +15,7 @@ class Buyer:
         code, self.token = self.auth.login(self.user_id, self.password, self.terminal)
         assert code == 200
 
-    def new_order(self, store_id: str, book_id_and_count: [(str, int)]) -> (int, str):
+    def new_order(self, store_id: str, book_id_and_count: tuple[(str, int)]) -> tuple[int, str]:
         books = []
         for id_count_pair in book_id_and_count:
             books.append({"id": id_count_pair[0], "count": id_count_pair[1]})
@@ -85,7 +85,7 @@ class Buyer:
         pages_json=response_json.get("pages")
         return r.status_code,pages_json
 
-    def next_page(self, page_now: int, pages: int,have_pic=True) -> tuple[int, str, list[str], int]:
+    def next_page(self, page_now: int, pages: int,have_pic=True) -> tuple[int, list[dict], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,
@@ -100,7 +100,7 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
 
-    def pre_page(self,  page_now: int,have_pic=True) -> tuple[int, str, list[str], int]:
+    def pre_page(self,  page_now: int,have_pic=True) -> tuple[int, list[dict], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,
@@ -114,7 +114,7 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
     
-    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=True) -> tuple[int, str, list[str], int]:
+    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=True) -> tuple[int, list[dict], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,
