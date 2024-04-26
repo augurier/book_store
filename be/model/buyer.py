@@ -30,21 +30,21 @@ class Buyer(db_conn.DBConn):
 
             
             for book_id, count in id_and_count:
-                row = col_store.find_one({'store_id': store_id, 'book_id': book_id},
-                                     {'_id': 0, 'book_id': 1, 'stock_level': 1, 'book_info': 1})
+                row = col_store.find_one({'store_id': store_id, 'books.book_id': book_id},
+                                     {'_id': 0, 'books.$': 1})
                 if row is None:
                     return error.error_non_exist_book_id(book_id) + (order_id,)
 
-                stock_level = row['stock_level']
-                book_info = row['book_info']
-                book_info_json = json.loads(book_info)
-                price = book_info_json.get("price")
+                stock_level = row['books'][0]['stock_level']
+                book_id = row['books'][0]['book_id']
+                row = self.col_book.find_one({'id': book_id},{'_id': 0, 'price': 1})
+                price = row['price']
 
                 if stock_level < count:
                     return error.error_stock_level_low(book_id) + (order_id,)
                 
-                rows = col_store.update_one({'store_id': store_id, 'book_id': book_id, 'stock_level': {'$gte': count}}, 
-                                           {'$inc': {'stock_level': -1}})
+                rows = col_store.update_one({'store_id': store_id, 'books.book_id': book_id, 'books.stock_level': {'$gte': count}}, 
+                                           {'$inc': {'books.$.stock_level': -count}})
                 if rows.matched_count != 1:
                     return error.error_stock_level_low(book_id) + (order_id,)
 
@@ -97,7 +97,7 @@ class Buyer(db_conn.DBConn):
     def payment(self, user_id: str, password: str, order_id: str) -> tuple[(int, str)]:
         try:
             col_user = self.database["user"]
-            col_user_store = self.database["user_store"]
+            col_store = self.database["store"]
             col_new_order = self.database["new_order"]
             col_new_order_detail = self.database["new_order_detail"]            
             col_his_order = self.database["his_order"]
@@ -127,7 +127,7 @@ class Buyer(db_conn.DBConn):
             if password != row['password']:
                 return error.error_authorization_fail()
 
-            row = col_user_store.find_one({'store_id': store_id}, 
+            row = col_store.find_one({'store_id': store_id}, 
                                           {'_id': 0, 'store_id': 1, 'user_id': 1})
             if row is None:
                 return error.error_non_exist_store_id(store_id)
@@ -251,8 +251,11 @@ class Buyer(db_conn.DBConn):
                               
                 target_store = {'store_id': store_id}
                 
-            rows = col_store.find(target_store, {'_id': 0, 'book_id': 1})
-            bids = tuple(row['book_id'] for row in rows)
+            rows = col_store.find(target_store, {'_id': 0, 'books.book_id': 1})
+            books = [row['books'] for row in rows]
+            bids = []
+            for book in books:
+                bids += [row['book_id'] for row in book]
 
             rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
                                {'_id': 0, 'id': 1})
@@ -266,6 +269,7 @@ class Buyer(db_conn.DBConn):
         except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e)),-1
         except BaseException as e:
+            logging.error(e)
             return 530, "{}".format(str(e)),-1
         
         return 200,"ok",pages
@@ -335,7 +339,7 @@ class Buyer(db_conn.DBConn):
                                    'as': 'store_item'}}
             project = {'$project': {'_id': 0, 'order_id': 1, 'store_id': 1, 'state': 1, 'order_datetime': 1,
                                     'book_id': '$order_detail.book_id', 'count': '$order_detail.count', 'price': '$order_detail.price',
-                                    'difference': {'$eq': ['$order_detail.book_id', '$store_item.book_id']}}}
+                                    'difference': {'$in': ['$order_detail.book_id', '$store_item.books.book_id']}}}
             match2 = {'$match': {'difference': True}}
             rows = col_his_order.aggregate([match1, look_up1, look_up2, project, match2])   
             res = [[row['order_id'], row['store_id'], row['state'], row['order_datetime'], row['book_id'], row['count'], row['price']] for row in rows]        

@@ -89,8 +89,16 @@ class TestSearch:
         book:Book=self.buy_book_info_list[0][0]
         code,pages=self.buyer.search('title',book.title[0])
         assert code == 200
-        code,bids,pages=self.buyer.specific_page(0,0,pages)
-        assert book.id in [row['id'] for row in bids]
+        flag=False
+        for page in range(pages+1):
+            code,bids,target_page=self.buyer.specific_page(0,page,pages,False)
+            assert code == 200
+            if book.id in [row['id'] for row in bids]:
+                logging.debug([row['id'] for row in bids])
+                assert True
+                flag=True
+                return 
+        assert flag
 
     def test_wrong_keyword(self):
         book:Book=self.buy_book_info_list[0][0]
