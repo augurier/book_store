@@ -2,7 +2,7 @@ import requests
 import simplejson
 from urllib.parse import urljoin
 from fe.access.auth import Auth
-
+from fe.conf import Has_picture
 
 class Buyer:
     def __init__(self, url_prefix, user_id, password):
@@ -69,7 +69,7 @@ class Buyer:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
 
-    def search(self,keyword,content,store_id="",have_pic=True)->tuple[int,int]:
+    def search(self,keyword,content,store_id="",have_pic=Has_picture)->tuple[int,int]:
         json={
             "user_id":self.user_id,
             "keyword":keyword,
@@ -85,7 +85,7 @@ class Buyer:
         pages_json=response_json.get("pages")
         return r.status_code,pages_json
 
-    def next_page(self, page_now: int, pages: int,have_pic=True) -> tuple[int, list[dict], int]:
+    def next_page(self, page_now: int, pages: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,
@@ -100,7 +100,7 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
 
-    def pre_page(self,  page_now: int,have_pic=True) -> tuple[int, list[dict], int]:
+    def pre_page(self,  page_now: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,
@@ -114,7 +114,7 @@ class Buyer:
         page_json=response_json.get("page")
         return r.status_code,bids_json,page_json
     
-    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=True) -> tuple[int, list[dict], int]:
+    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
         json={
             "user_id":self.user_id,
             "page_now":page_now,

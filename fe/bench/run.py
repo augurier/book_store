@@ -12,24 +12,26 @@ from be.model.store import init_completed_event
 from urllib.parse import urljoin
 from fe import conf
 import requests
+from tqdm import *
 thread:threading.Thread = None
 
-logging.basicConfig(filename='bench.log',level=logging.INFO)
+logging.basicConfig(filename='bench.log',filemode='w',level=logging.INFO)
 
 def run_bench():
     wl = Workload()
     wl.gen_database()
 
     sessions = []
-    for i in range(0, wl.session):
-        ss = Session(wl)
+    for i in tqdm(range(0, wl.session),"init sessions"):
+        ss = Session(wl,i)
         sessions.append(ss)
 
     for ss in sessions:
         ss.start()
 
-    for ss in sessions:
+    for ss in tqdm(sessions,"sessions ended"):
         ss.join()
+        # logging.info("session ended")
 
 
 if __name__ == "__main__":
