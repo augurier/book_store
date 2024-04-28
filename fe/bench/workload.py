@@ -95,7 +95,7 @@ class Workload:
                     if len(books) == 0:
                         break
                     for bk in books:
-                        code = seller.add_book(store_id, self.stock_level, bk)
+                        code = seller.add_book(store_id, self.stock_level, bk.id)
                         assert code == 200
                         self.book_ids[store_id].append(bk.id)
                     row_no = row_no + len(books)

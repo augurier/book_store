@@ -1,3 +1,4 @@
+import logging
 import pymongo.errors as mongo_error
 from be.model import error
 from be.model import db_conn
@@ -13,7 +14,6 @@ class Seller(db_conn.DBConn):
         user_id: str,
         store_id: str,
         book_id: str,
-        book_json_str: str,
         stock_level: int,
     ):
         try:
@@ -25,15 +25,11 @@ class Seller(db_conn.DBConn):
                 return error.error_exist_book_id(book_id)
 
             col_store = self.database["store"]
-            store1 = {
-                'store_id' : store_id,
-                'book_id' : book_id,
-                'book_info' : book_json_str,
-                'stock_level' : stock_level
-            }
-            col_store.insert_one(store1)
+            col_store.update_one( {"store_id": store_id},
+            {"$push": {"books": {"book_id": book_id, "stock_level": stock_level}}})
 
         except mongo_error.PyMongoError as e:
+            logging.error(e)
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
@@ -53,8 +49,8 @@ class Seller(db_conn.DBConn):
                 return error.error_non_exist_book_id(book_id)
 
             col_store = self.database["store"]
-            col_store.update_one({'store_id': store_id, 'book_id': book_id}, 
-                                 {'$inc': {'stock_level': add_stock_level}})
+            col_store.update_one({'store_id': store_id, 'books.book_id': book_id}, 
+                                 {'$inc': {'books.$.stock_level': add_stock_level}})
             
         except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))
@@ -70,12 +66,13 @@ class Seller(db_conn.DBConn):
             if self.store_id_exist(store_id):
                 return error.error_exist_store_id(store_id)
             
-            col_user_store = self.database["user_store"]
-            user_store1 = {
+            col_store = self.database["store"]
+            store1 = {
                 'store_id' : store_id,
                 'user_id' : user_id,
+                "books": []
             }
-            col_user_store.insert_one(user_store1)
+            col_store.insert_one(store1)
             
         except mongo_error.PyMongoError as e:
             return 528, "{}".format(str(e))

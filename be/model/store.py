@@ -24,19 +24,21 @@ class Store:
             #     "user_id TEXT PRIMARY KEY, password TEXT NOT NULL, "
             #     "balance INTEGER NOT NULL, token TEXT, terminal TEXT, bids []);"
             # )
-            self.database["user_store"].drop()
-            col_user_store = self.database["user_store"]
-            col_user_store.create_index([("user_id", 1), ("store_id", 1)], unique=True)
+            
+            # self.database["user_store"].drop()
+            # col_user_store = self.database["user_store"]
+            # col_user_store.create_index([("user_id", 1), ("store_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS user_store("
             #     "user_id TEXT, store_id, PRIMARY KEY(user_id, store_id));"
-            # )       
+            # )      
+             
             self.database["store"].drop()
             col_store = self.database["store"]
-            col_store.create_index([("store_id", 1), ("book_id", 1)], unique=True)
+            col_store.create_index([("store_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS store( "
-            #     "store_id TEXT, book_id TEXT, book_info TEXT, stock_level INTEGER,"
+            #     "store_id TEXT, user_id TEXT, book_id TEXT, book_info TEXT, stock_level INTEGER,"
             #     " PRIMARY KEY(store_id, book_id))"
             # )
             self.database["new_order"].drop()
@@ -65,7 +67,6 @@ class Store:
             #     "state TEXT DEFAULT 'wait for payment', "
             #     "order_datetime TEXT)"
             # )
-            self.database["history_order_detail"].drop()
             self.database["his_order_detail"].drop()
             col_his_order_detail = self.database["his_order_detail"]
             col_his_order_detail.create_index([("order_id", 1), ("book_id", 1)], unique=True)
