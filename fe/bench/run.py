@@ -14,7 +14,7 @@ from fe import conf
 import requests
 thread:threading.Thread = None
 
-logging.basicConfig(filename='bench.log',level=logging.INFO)
+logging.basicConfig(filename='bench.log',filemode='w',level=logging.INFO)
 
 def run_bench():
     wl = Workload()
@@ -30,6 +30,7 @@ def run_bench():
 
     for ss in sessions:
         ss.join()
+        logging.info("session ended")
 
 
 if __name__ == "__main__":

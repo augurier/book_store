@@ -3,7 +3,7 @@ from fe.bench.workload import NewOrder
 from fe.bench.workload import Payment
 import time
 import threading
-
+import logging
 
 class Session(threading.Thread):
     def __init__(self, wl: Workload):
@@ -19,6 +19,7 @@ class Session(threading.Thread):
         self.time_payment = 0
         self.thread = None
         self.gen_procedure()
+        logging.info("procedure generated")
 
     def gen_procedure(self):
         for i in range(0, self.workload.procedure_per_session):
@@ -42,14 +43,6 @@ class Session(threading.Thread):
             if self.new_order_i % 100 ==0 or self.new_order_i == len(
                 self.new_order_request
             ):
-                self.workload.update_stat(
-                    self.new_order_i,
-                    self.payment_i,
-                    self.new_order_ok,
-                    self.payment_ok,
-                    self.time_new_order,
-                    self.time_payment,
-                )
                 for payment in self.payment_request:
                     before = time.time()
                     ok = payment.run()
@@ -58,4 +51,18 @@ class Session(threading.Thread):
                     self.payment_i = self.payment_i + 1
                     if ok:
                         self.payment_ok = self.payment_ok + 1
+                self.workload.update_stat(
+                    self.new_order_i,
+                    self.payment_i,
+                    self.new_order_ok,
+                    self.payment_ok,
+                    self.time_new_order,
+                    self.time_payment,
+                )
+                self.new_order_i=0
+                self.payment_i=0
+                self.new_order_ok=0
+                self.payment_ok=0
+                self.time_new_order=0
+                self.time_payment=0
                 self.payment_request = []

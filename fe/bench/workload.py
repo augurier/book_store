@@ -138,8 +138,9 @@ class Workload:
         time_payment,
     ):
         # 获取当前并发数
-        thread_num = len(threading.enumerate())
-        # 加索
+        #thread_num = len(threading.enumerate())
+        thread_num=self.session
+        # 加锁
         self.lock.acquire()
         self.n_new_order = self.n_new_order + n_new_order
         self.n_payment = self.n_payment + n_payment
@@ -173,15 +174,15 @@ class Workload:
                         / (
                             self.time_payment / n_payment_diff
                             + self.time_new_order / n_new_order_diff
-                        )
+                        )*thread_num
                     ),  # 吞吐量:完成订单数/((付款所用时间+订单所用时间)/并发数)
                     self.n_new_order_ok,
-                    n_new_order_diff,
+                    thread_num, #n_new_order_diff,
                     self.n_new_order,
                     self.time_new_order
                     / self.n_new_order,  # 订单延迟:(创建订单所用时间/并发数)/新创建订单数
                     self.n_payment_ok,
-                    n_payment_diff,
+                    thread_num, #n_payment_diff,
                     self.n_payment,
                     self.time_payment / self.n_payment,  # 付款延迟:(付款所用时间/并发数)/付款订单数
                 )

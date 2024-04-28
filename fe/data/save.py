@@ -7,7 +7,7 @@ def get_book_cursor(start, size, islarge=False):
         books = []
         parent_path = os.path.dirname(os.path.dirname(__file__))
         if islarge:
-            book_db = os.path.join(parent_path, "data/book_lx.db")
+            book_db = os.path.join(parent_path, "data/book_lx(1).db")
         else:
             book_db = os.path.join(parent_path, "data/book.db")            
         conn = sqlite3.connect(book_db)
@@ -28,7 +28,7 @@ mydb = myclient["bookstore_db"]
 mycol = mydb["book"]
 mycol.delete_many({})
 mycol.create_index([("id", 1)], unique=True)
-cursor = get_book_cursor(0, 69)
+cursor = get_book_cursor(0, 10000,True)
 booklist = []
 for row in cursor:
     book = {
