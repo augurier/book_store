@@ -250,7 +250,9 @@ def specific_page(self, user_id: str, page_now: int, target_page: int, pages: in
 
 ## 5. 测试结果
 
-![alt text](pics/p4.png)![alt text](pics/p5.png)
+![alt text](pics/p4.png)
+![alt text](pics/p5.png)
+
 考虑到每个函数下面都有四五行调试产生的except无需覆盖，我们的测试样例已实际覆盖了几乎所有的分支。
 ![alt text](pics/p6.png)
 
@@ -268,7 +270,10 @@ def specific_page(self, user_id: str, page_now: int, target_page: int, pages: in
 
 ### 7.1 git版本控制
 我们的github仓库地址是 https://github.com/augurier/book_store 
-每位组员拥有自己的branch，便于开发的并发完成（比如前60%功能从sql到mongodb的转换，与后40%功能的实现就是同步进行），大部分代码也是在自己的分支上完成后merge到主分支![alt text](pics/p1.png)![alt text](pics/p2.png)
+每位组员拥有自己的branch，便于开发的并发完成（比如前60%功能从sql到mongodb的转换，与后40%功能的实现就是同步进行），大部分代码也是在自己的分支上完成后merge到主分支
+![alt text](pics/p1.png)
+
+![alt text](pics/p2.png)
 
 ### 7.2 分工
 
