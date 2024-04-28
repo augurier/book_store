@@ -169,18 +169,18 @@ class Workload:
             # LATENCY:提交付款订单时间/处理付款订单笔数(只考虑该线程延迟，未考虑并发)
             logging.info(
                 "TPS_C={}, NO=OK:{} Thread_num:{} TOTAL:{} LATENCY:{} , P=OK:{} Thread_num:{} TOTAL:{} LATENCY:{}".format(
-                    int(
-                        self.n_new_order_ok
-                        / (
-                            self.time_payment / n_payment_diff
-                            + self.time_new_order / n_new_order_diff
-                        )*thread_num
-                    ),  # 吞吐量:完成订单数/((付款所用时间+订单所用时间)/并发数)
+                    # int(
+                    #     self.n_new_order_ok
+                    #     / (
+                    #         self.time_payment / n_payment_diff
+                    #         + self.time_new_order / n_new_order_diff
+                    #     )*thread_num
+                    # ),  # 吞吐量:完成订单数/((付款所用时间+订单所用时间)/并发数)
+                    int(self.n_new_order_ok*1000/(self.time_payment*1000+self.time_new_order*1000)*thread_num), # 吞吐量:完成订单数/((付款所用时间+订单所用时间)/并发数)
                     self.n_new_order_ok,
                     thread_num, #n_new_order_diff,
                     self.n_new_order,
-                    self.time_new_order
-                    / self.n_new_order,  # 订单延迟:(创建订单所用时间/并发数)/新创建订单数
+                    self.time_new_order / self.n_new_order,  # 订单延迟:(创建订单所用时间/并发数)/新创建订单数
                     self.n_payment_ok,
                     thread_num, #n_payment_diff,
                     self.n_payment,

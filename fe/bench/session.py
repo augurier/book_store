@@ -4,9 +4,10 @@ from fe.bench.workload import Payment
 import time
 import threading
 import logging
+from tqdm import *
 
 class Session(threading.Thread):
-    def __init__(self, wl: Workload):
+    def __init__(self, wl: Workload,ind:int):
         threading.Thread.__init__(self)
         self.workload = wl
         self.new_order_request = []
@@ -18,11 +19,10 @@ class Session(threading.Thread):
         self.time_new_order = 0
         self.time_payment = 0
         self.thread = None
-        self.gen_procedure()
-        logging.info("procedure generated")
+        self.gen_procedure(ind)
 
-    def gen_procedure(self):
-        for i in range(0, self.workload.procedure_per_session):
+    def gen_procedure(self,ind:int):
+        for i in tqdm(range(0, self.workload.procedure_per_session),"session {} init".format(ind)):
             new_order = self.workload.get_new_order()
             self.new_order_request.append(new_order)
 
