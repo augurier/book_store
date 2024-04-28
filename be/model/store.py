@@ -35,7 +35,7 @@ class Store:
              
             self.database["store"].drop()
             col_store = self.database["store"]
-            col_store.create_index([("store_id", 1), ("book_id", 1)], unique=True)
+            col_store.create_index([("store_id", 1)], unique=True)
             # conn.execute(
             #     "CREATE TABLE IF NOT EXISTS store( "
             #     "store_id TEXT, user_id TEXT, book_id TEXT, book_info TEXT, stock_level INTEGER,"
@@ -67,7 +67,6 @@ class Store:
             #     "state TEXT DEFAULT 'wait for payment', "
             #     "order_datetime TEXT)"
             # )
-            self.database["history_order_detail"].drop()
             self.database["his_order_detail"].drop()
             col_his_order_detail = self.database["his_order_detail"]
             col_his_order_detail.create_index([("order_id", 1), ("book_id", 1)], unique=True)
