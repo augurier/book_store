@@ -2,7 +2,7 @@ import requests
 import simplejson
 from urllib.parse import urljoin
 from fe.access.auth import Auth
-
+from fe.conf import Has_picture
 
 class Buyer:
     def __init__(self, url_prefix, user_id, password):
@@ -15,7 +15,7 @@ class Buyer:
         code, self.token = self.auth.login(self.user_id, self.password, self.terminal)
         assert code == 200
 
-    def new_order(self, store_id: str, book_id_and_count: [(str, int)]) -> (int, str):
+    def new_order(self, store_id: str, book_id_and_count: tuple[(str, int)]) -> tuple[int, str]:
         books = []
         for id_count_pair in book_id_and_count:
             books.append({"id": id_count_pair[0], "count": id_count_pair[1]})
@@ -69,20 +69,69 @@ class Buyer:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
 
-    def search(self,keyword,content,store_id="")->tuple[int,list[str]]:
+    def search(self,keyword,content,store_id="",have_pic=Has_picture)->tuple[int,int]:
         json={
+            "user_id":self.user_id,
             "keyword":keyword,
             "content":content,
             "store_id":store_id,
+            "have_pic":have_pic
         }
         url=urljoin(self.url_prefix,"search")
         headers={"token":self.token}
         r=requests.post(url,headers=headers,json=json)
         response_json=r.json()
-        bids_json=response_json.get("bids")
-        return r.status_code,bids_json
+        # bids_json=response_json.get("bids")
+        pages_json=response_json.get("pages")
+        return r.status_code,pages_json
 
-    def history_order(self)->tuple[int,list[str]]:
+    def next_page(self, page_now: int, pages: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
+        json={
+            "user_id":self.user_id,
+            "page_now":page_now,
+            "pages":pages,
+            "have_pic":have_pic
+        }
+        url=urljoin(self.url_prefix,"next_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+
+    def pre_page(self,  page_now: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
+        json={
+            "user_id":self.user_id,
+            "page_now":page_now,
+            "have_pic":have_pic
+        }
+        url=urljoin(self.url_prefix,"pre_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+    
+    def specific_page(self, page_now: int, target_page: int, pages: int,have_pic=Has_picture) -> tuple[int, str, list[str], int]:
+        json={
+            "user_id":self.user_id,
+            "page_now":page_now,
+            "target_page":target_page,
+            "pages":pages,
+            "have_pic":have_pic
+        }
+        url=urljoin(self.url_prefix,"specific_page")
+        headers={"token":self.token}
+        r=requests.post(url,headers=headers,json=json)
+        response_json=r.json()
+        bids_json=response_json.get("bids")
+        page_json=response_json.get("page")
+        return r.status_code,bids_json,page_json
+    
+    
+    def history_order(self)->tuple[int,list[any]]:
         json={
             "user_id":self.user_id,
         }

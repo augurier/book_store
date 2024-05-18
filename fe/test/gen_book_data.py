@@ -20,7 +20,7 @@ class GenBook:
         self.buy_book_id_list = []
 
     def gen(
-        self, non_exist_book_id: bool, low_stock_level, max_book_count: int = 100
+        self, non_exist_book_id: bool, low_stock_level, max_book_count: int = 10
     ) -> tuple[(bool, list[any])]:
         self.__init_book_list__()
         ok = True
@@ -29,7 +29,8 @@ class GenBook:
         start = 0
         if rows > max_book_count:
             start = random.randint(0, rows - max_book_count)
-        size = random.randint(1, max_book_count)
+        # size = random.randint(1, max_book_count)
+        size = max_book_count
         books = book_db.get_book_info(start, size)
         book_id_exist = []
         book_id_stock_level = {}

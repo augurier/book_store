@@ -1,22 +1,29 @@
 import logging
-import os
-import sqlite3 as sqlite
 import threading
+import psycopg2
 
 class Store:
     database: str
 
     def __init__(self, db_path):
-        self.database = os.path.join(db_path, "be.db")
-        self.book_db=os.path.join(db_path,"book.db")
+        connect = psycopg2.connect(
+        host="localhost",
+        database="bookstore_db",
+        user="postgres",
+        password="lidu12345"
+        )
+        self.database = connect
+        # self.database = os.path.join(db_path, "be.db")
+        # self.book_db=os.path.join(db_path,"book.db")
         # logging.error(os.path.dirname(__file__))
         self.init_tables()
 
     def init_tables(self):
         try:
-            conn , book_conn= self.get_db_conn()
+            con = self.get_db_conn() 
+            conn = con.cursor() #cursor
 
-            conn.execute("""DROP TABLE IF EXISTS user""")
+            conn.execute("""DROP TABLE IF EXISTS user_""")
 
             conn.execute("""DROP TABLE IF EXISTS user_store""")
 
@@ -33,14 +40,14 @@ class Store:
             # conn.execute("DROP TABLE IF EXISTS book")
 
             conn.execute(
-                "CREATE TABLE IF NOT EXISTS user ("
+                "CREATE TABLE IF NOT EXISTS user_ ("
                 "user_id TEXT PRIMARY KEY, password TEXT NOT NULL, "
-                "balance INTEGER NOT NULL, token TEXT, terminal TEXT);"
+                "balance INTEGER NOT NULL, token TEXT, terminal TEXT, bids TEXT);"
             )
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS user_store("
-                "user_id TEXT, store_id, PRIMARY KEY(user_id, store_id));"
+                "user_id TEXT, store_id TEXT, PRIMARY KEY(user_id, store_id));"
             )
 
             conn.execute(
@@ -98,14 +105,13 @@ class Store:
             #     )
             #     """
             # )
-
-            conn.commit()
-        except sqlite.Error as e:
+            con.commit()
+        except psycopg2.Error as e:
             logging.error(e)
-            conn.rollback()
+            # conn.rollback()
 
-    def get_db_conn(self) -> tuple[(sqlite.Connection,sqlite.Connection)]:
-        return sqlite.connect(self.database),sqlite.connect(self.book_db)
+    def get_db_conn(self):
+        return self.database
 
 
 database_instance: Store = None

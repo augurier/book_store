@@ -1,7 +1,6 @@
 htmlcov/**
 __pycache__
 .coverage
-fe/data/*
-be.db
+*.db
 *.ipynb
 *.log

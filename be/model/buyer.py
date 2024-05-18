@@ -1,11 +1,13 @@
-import sqlite3 as sqlite
 import uuid
 import json
 import logging
+
+import psycopg2
 from be.model import db_conn
 from be.model import error
 import time
 
+SEARCH_PAGE_LENGTH = 5
 
 class Buyer(db_conn.DBConn):
     def __init__(self):
@@ -23,12 +25,12 @@ class Buyer(db_conn.DBConn):
             uid = "{}_{}_{}".format(user_id, store_id, str(uuid.uuid1()))
 
             for book_id, count in id_and_count:
-                cursor = self.conn.execute(
+                self.conn.execute(
                     "SELECT book_id, stock_level, book_info FROM store "
-                    "WHERE store_id = ? AND book_id = ?;",
+                    "WHERE store_id = %s AND book_id = %s;",
                     (store_id, book_id),
                 )
-                row = cursor.fetchone()
+                row = self.conn.fetchone()
                 if row is None:
                     return error.error_non_exist_book_id(book_id) + (order_id,)
 
@@ -40,17 +42,14 @@ class Buyer(db_conn.DBConn):
                 if stock_level < count:
                     return error.error_stock_level_low(book_id) + (order_id,)
 
-                cursor = self.conn.execute(
-                    "UPDATE store set stock_level = stock_level - ? "
-                    "WHERE store_id = ? and book_id = ? and stock_level >= ?; ",
+                self.conn.execute(
+                    "UPDATE store set stock_level = stock_level - %s "
+                    "WHERE store_id = %s and book_id = %s and stock_level >= %s; ",
                     (count, store_id, book_id, count),
                 )
-                if cursor.rowcount == 0:
-                    return error.error_stock_level_low(book_id) + (order_id,)
-
                 self.conn.execute(
                     "INSERT INTO new_order_detail(order_id, book_id, count, price) "
-                    "VALUES(?, ?, ?, ?);",
+                    "VALUES(%s, %s, %s, %s);",
                     (uid, book_id, count, price),
                 )
 
@@ -58,12 +57,12 @@ class Buyer(db_conn.DBConn):
             cur_time=str(int(time.time())) #纪元以来的秒数
             self.conn.execute(
                 "INSERT INTO new_order(order_id, store_id, user_id,state,order_datetime) "
-                "VALUES(?, ?, ?, ?, ?);",
+                "VALUES(%s, %s, %s, %s, %s);",
                 (uid, store_id, user_id, "wait for payment", cur_time),
             )
-            self.conn.commit()
+            self.con.commit()
             order_id = uid
-        except sqlite.Error as e:
+        except psycopg2.Error as e:
             logging.info("528, {}".format(str(e)))
             return 528, "{}".format(str(e)), ""
         except BaseException as e:
@@ -76,21 +75,21 @@ class Buyer(db_conn.DBConn):
     def order_timeout(self,order_id:str) -> tuple[(int,str)]:
         conn=self.conn
         try:
-            cursor=conn.execute("INSERT INTO history_order SELECT * FROM new_order WHERE order_id=?",
+            conn.execute("INSERT INTO history_order SELECT * FROM new_order WHERE order_id=%s",
                                 (order_id,))
-            cursor=conn.execute("UPDATE history_order SET state = 'cancelled' "
-                                "WHERE state='wait for payment' AND order_id=?",
+            conn.execute("UPDATE history_order SET state = 'cancelled' "
+                                "WHERE state='wait for payment' AND order_id=%s",
                                 (order_id,))
-            cursor=conn.execute("DELETE FROM new_order WHERE order_id=?",
+            conn.execute("DELETE FROM new_order WHERE order_id=%s",
                                 (order_id,))
             
-            cursor=conn.execute("INSERT INTO history_order_detail SELECT * FROM new_order_detail "
-                                "WHERE order_id=?",
+            conn.execute("INSERT INTO history_order_detail SELECT * FROM new_order_detail "
+                                "WHERE order_id=%s",
                                 (order_id,))
-            cursor=conn.execute("DELETE FROM new_order_detail WHERE order_id=?",
+            conn.execute("DELETE FROM new_order_detail WHERE order_id=%s",
                                 (order_id,))
 
-        except sqlite.Error as e:
+        except psycopg2.Error as e:
             logging.error(str(e))
             return 528, "{}".format(str(e))
 
@@ -101,11 +100,11 @@ class Buyer(db_conn.DBConn):
     def payment(self, user_id: str, password: str, order_id: str) -> tuple[int, str]:
         conn = self.conn
         try:
-            cursor = conn.execute(
-                "SELECT order_id, user_id, store_id,order_datetime FROM new_order WHERE order_id = ?",
+            conn.execute(
+                "SELECT order_id, user_id, store_id, order_datetime FROM new_order WHERE order_id = %s",
                 (order_id,),
             )
-            row = cursor.fetchone()
+            row = conn.fetchone()
             if row is None:
                 return error.error_invalid_order_id(order_id)
 
@@ -120,21 +119,21 @@ class Buyer(db_conn.DBConn):
             if order_datetime+timeout_limit<int(time.time()):
                 return self.order_timeout(order_id)
 
-            cursor = conn.execute(
-                "SELECT balance, password FROM user WHERE user_id = ?;", (buyer_id,)
+            conn.execute(
+                "SELECT balance, password FROM user_ WHERE user_id = %s;", (buyer_id,)
             )
-            row = cursor.fetchone()
+            row = conn.fetchone()
             if row is None:
                 return error.error_non_exist_user_id(buyer_id)
             balance = row[0]
             if password != row[1]:
                 return error.error_authorization_fail()
 
-            cursor = conn.execute(
-                "SELECT store_id, user_id FROM user_store WHERE store_id = ?;",
+            conn.execute(
+                "SELECT store_id, user_id FROM user_store WHERE store_id = %s;",
                 (store_id,),
             )
-            row = cursor.fetchone()
+            row = conn.fetchone()
             if row is None:
                 return error.error_non_exist_store_id(store_id)
 
@@ -143,12 +142,13 @@ class Buyer(db_conn.DBConn):
             if not self.user_id_exist(seller_id):
                 return error.error_non_exist_user_id(seller_id)
 
-            cursor = conn.execute(
-                "SELECT book_id, count, price FROM new_order_detail WHERE order_id = ?;",
+            conn.execute(
+                "SELECT book_id, count, price FROM new_order_detail WHERE order_id = %s;",
                 (order_id,),
             )
+            rows = conn.fetchall()
             total_price = 0
-            for row in cursor:
+            for row in rows:
                 count = row[1]
                 price = row[2]
                 total_price = total_price + price * count
@@ -156,59 +156,48 @@ class Buyer(db_conn.DBConn):
             if balance < total_price:
                 return error.error_not_sufficient_funds(order_id)
 
-            cursor = conn.execute(
-                "UPDATE user set balance = balance - ? "
-                "WHERE user_id = ? AND balance >= ?",
+            conn.execute(
+                "UPDATE user_ set balance = balance - %s "
+                "WHERE user_id = %s AND balance >= %s",
                 (total_price, buyer_id, total_price),
             )
-            if cursor.rowcount == 0:
-                return error.error_not_sufficient_funds(order_id)
 
-            cursor = conn.execute(
-                "UPDATE user set balance = balance + ?" "WHERE user_id = ?",
+            conn.execute(
+                "UPDATE user_ set balance = balance + %s WHERE user_id = %s",
                 (total_price, seller_id),
             )
 
-            if cursor.rowcount == 0:
-                return error.error_non_exist_user_id(seller_id)
-
             # order从new_order中删除并插入history_order中
-            cursor = conn.execute(
+            conn.execute(
                 "INSERT INTO history_order "
-                "SELECT * FROM new_order WHERE order_id=?",
+                "SELECT * FROM new_order WHERE order_id = %s",
                 (order_id,),
             )
             # 更新state为等待发货
-            cursor = conn.execute(
+            conn.execute(
                 "UPDATE history_order "
                 "SET state='wait for delivery' "
-                "WHERE order_id=?",
+                "WHERE order_id = %s",
                 (order_id,),
             )
-            if cursor.rowcount == 0:
-                return error.error_invalid_order_id(order_id)
-            cursor = conn.execute(
-                "DELETE FROM new_order WHERE order_id = ?", (order_id,)
+            conn.execute(
+                "DELETE FROM new_order WHERE order_id = %s", (order_id,)
             )
-            if cursor.rowcount == 0:
-                return error.error_invalid_order_id(order_id)
 
             # order_detail从new_order_detail中删除并插入history_order_detail中
-            cursor = conn.execute(
+            conn.execute(
                 "INSERT INTO history_order_detail "
-                "SELECT * FROM new_order_detail WHERE order_id=?",
+                "SELECT * FROM new_order_detail WHERE order_id=%s",
                 (order_id,),
             )
-            conn.commit()
-            cursor = conn.execute(
-                "DELETE FROM new_order_detail where order_id = ?", (order_id,)
+            self.con.commit()
+            conn.execute(
+                "DELETE FROM new_order_detail where order_id = %s", (order_id,)
             )
-            if cursor.rowcount == 0:
-                return error.error_invalid_order_id(order_id)
 
-            conn.commit()
+            self.con.commit()
 
-        except sqlite.Error as e:
+        except psycopg2.Error as e:
             logging.error(str(e))
             return 528, "{}".format(str(e))
 
@@ -219,25 +208,22 @@ class Buyer(db_conn.DBConn):
 
     def add_funds(self, user_id, password, add_value) -> tuple[int, str]:
         try:
-            cursor = self.conn.execute(
-                "SELECT password from user where user_id=?", (user_id,)
+            self.conn.execute(
+                "SELECT password from user_ where user_id = %s", (user_id,)
             )
-            row = cursor.fetchone()
+            row = self.conn.fetchone()
             if row is None:
                 return error.error_authorization_fail()
 
             if row[0] != password:
                 return error.error_authorization_fail()
 
-            cursor = self.conn.execute(
-                "UPDATE user SET balance = balance + ? WHERE user_id = ?",
+            self.conn.execute(
+                "UPDATE user_ SET balance = balance + %s WHERE user_id = %s",
                 (add_value, user_id),
             )
-            if cursor.rowcount == 0:
-                return error.error_non_exist_user_id(user_id)
-
-            self.conn.commit()
-        except sqlite.Error as e:
+            self.con.commit()
+        except psycopg2.Error as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
@@ -252,43 +238,37 @@ class Buyer(db_conn.DBConn):
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
             #修改state状态，并将其从new_order移到history_order
-            cursor = conn.execute(
+            conn.execute(
                 "UPDATE new_order set state='cancelled' "
-                "WHERE user_id=? AND order_id=? AND state='wait for payment'",
+                "WHERE user_id = %s AND order_id = %s AND state='wait for payment'",
                 (user_id,order_id)
             )
-            if cursor.rowcount==0:
-                return error.error_invalid_order_id(order_id)
             
-            cursor=conn.execute(
+            conn.execute(
                 "INSERT INTO history_order "
-                "SELECT * FROM new_order WHERE order_id=?",
+                "SELECT * FROM new_order WHERE order_id=%s",
                 (order_id,)
             )
-            cursor=conn.execute(
+            conn.execute(
                 "DELETE FROM new_order "
-                "WHERE order_id=?",
+                "WHERE order_id=%s",
                 (order_id,)
             )
-            if cursor.rowcount==0:
-                return error.error_invalid_order_id(order_id)
             
             #将new_order_detail做出相应的改动
-            cursor=conn.execute(
+            conn.execute(
                 "INSERT INTO history_order_detail "
-                "SELECT * FROM new_order_detail WHERE order_id=?",
+                "SELECT * FROM new_order_detail WHERE order_id=%s",
                 (order_id,)
             )
-            cursor=conn.execute(
+            conn.execute(
                 "DELETE FROM new_order_detail "
-                "WHERE order_id=?",
+                "WHERE order_id=%s",
                 (order_id,)
             )
-            if cursor.rowcount==0:
-                return error.error_invalid_order_id(order_id)
 
-            conn.commit()
-        except sqlite.Error as e:
+            self.con.commit()
+        except psycopg2.Error as e:
             logging.error(str(e))
             return 528, "{}".format(str(e))
         except BaseException as e:
@@ -301,65 +281,139 @@ class Buyer(db_conn.DBConn):
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
 
-            cursor=conn.execute(
+            conn.execute(
                 "UPDATE history_order SET state='received' "
-                "WHERE user_id=? AND order_id=? AND state='delivering'",
+                "WHERE user_id=%s AND order_id=%s AND state='delivering'",
                 (user_id,order_id)
             )
-            if cursor.rowcount==0:
-                return error.error_invalid_order_id(order_id)
 
-            conn.commit()
-        except sqlite.Error as e:
+            self.con.commit()
+        except psycopg2.Error as e:
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
         return 200,"ok"
     
     #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
-    def search(self,keyword:str,content:str,store_id:str) -> tuple[(int,str,list[str])]:
+    def search(self,user_id:str,keyword:str,content:str,store_id:str) -> tuple[(int,str,int)]:
         conn = self.conn
-        book_conn=self.book_conn
+        book_tb = self.book_tb
         try:
+            self.conn.execute(
+                "UPDATE user_ SET bids = %s WHERE user_id = %s",
+                ('', user_id),
+            )
+            self.con.commit()
+            
+            keyword_scope = ['id', 'title', 'author', 'publisher', 'original_title', 'translator', 'pub_year', 'currency_unit', 'binding', 'isbn']
+            if keyword not in keyword_scope:
+                return error.error_wrong_keyword(keyword)+(-1,)
+            
             sql = """select distinct book_id from store """
-            if not store_id=="":
-                sql+=" where store_id='{}'".format(store_id)
+            if not store_id == "":
+                sql += " where store_id='{}'".format(store_id)
                 if not self.store_id_exist(store_id):
-                    return error.error_non_exist_store_id(store_id)+([],)
-            # logging.info(sql)
-            cursor=conn.execute(sql)
-            # if cursor.rowcount == 0:
-            #     return 200,"ok",[]
-            logging.info(cursor.rowcount)
-            row=cursor.fetchall()
-            logging.info(row)
+                    return error.error_non_exist_store_id(store_id)+(-1,)
+            conn.execute(sql)
+            row = conn.fetchall()
             if row == []:
-                return 200,"ok",[]
+                return 200,"ok",0
             bids:tuple[str,]=tuple(map(lambda x:x[0],row))
             if len(bids) == 1 :
                 bids="('"+str(bids[0])+"')"
-            search_sql="""select id from book 
-                where id in {} and {} like '%{}%'""".format(bids,keyword,content)
-            # logging.info(search_sql)
-            cursor=book_conn.execute(search_sql)
-            # if cursor.rowcount==0:
-            #     return 200,"ok",[]
-            row = cursor.fetchall()
+              
+            search_sql="""select id from {} 
+                where id in {} and {} like '%{}%'""".format(book_tb,bids,keyword,content)
+            conn.execute(search_sql)
+            row = conn.fetchall()
             if row == []:
-                return 200,"ok",[]
-            res=list(map(lambda x:x[0],row))
-            conn.commit()
-        except sqlite.Error as e:
-            logging.info(str(e))
-            return 528, "{}".format(str(e)),[]
+                logging.error('aaa')
+                return 200,"ok",0
+            res = list(map(lambda x:x[0],row))
+            bids = ','.join(res)
+            conn.execute(
+                "UPDATE user_ SET bids = %s WHERE user_id = %s",
+                (bids, user_id),
+            )
+            self.con.commit()
+            pages = len(res) // SEARCH_PAGE_LENGTH #结果共几页
+        except psycopg2.Error as e:
+            logging.error(e)
+            return 528, "{}".format(str(e)),-1
         except BaseException as e:
-            return 530, "{}".format(str(e)),[]
-        return 200,"ok",res
+            return 530, "{}".format(str(e)),-1
+        return 200,"ok",pages
+    
+    def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
+        res = []
+        book_tb = self.book_tb
+        # have_pic=False
+        # if have_pic:
+        #     content = {'_id': 0}
+        # else:
+        #     content = {'_id': 0, 'picture': 0}
+        self.conn.execute(
+            "select bids from user_ where user_id = %s",
+            (user_id,)
+        )
+        row = self.conn.fetchone()
+        bids = tuple(row[0].split(','))
+        if len(bids) == 1 :
+            bids="('"+str(bids[0])+"')"
+        # col_user = self.database["user"]
+        # row = col_user.find_one({'user_id': user_id}, {'bids': 1})   
+        # bids = row["bids"] 
+        sql = "select * from {}".format(book_tb)
+        # if have_pic:
+        #     sql = "select * from book "
+        # else:
+        #     sql = '''select id, title, author,
+        #     publisher, original_title,
+        #     translator, pub_year, pages,
+        #     price, currency_unit, binding,
+        #     isbn, author_intro, book_intro, 
+        #     content, tags from book '''
+        sql += " where id in {}".format(bids)
+        self.conn.execute(sql)
+        res = self.conn.fetchall()
+        self.con.commit()
+        # col_book = self.col_book
+        # rows = col_book.find({'id': {'$in': bids}}, content)
+        # res = [row for row in rows]  
+        # if have_pic:
+        #     for row in res:
+        #         row['picture']=str(row['picture'])
+        return res
+    
+    def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        next_page = page_now + 1
+        if next_page > pages:
+            return error.error_non_exist_page(next_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[next_page * SEARCH_PAGE_LENGTH: (next_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,next_page
+    
+    def pre_page(self, user_id: str, page_now: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        pre_page = page_now - 1
+        if pre_page < 0:
+            return error.error_non_exist_page(pre_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[pre_page * SEARCH_PAGE_LENGTH: (pre_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,pre_page
+    
+    def specific_page(self, user_id: str, page_now: int, target_page: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        if target_page > pages or target_page < 0:
+            return error.error_non_exist_page(target_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[target_page * SEARCH_PAGE_LENGTH: (target_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,target_page
 
     def history_order(self,user_id:str)->tuple[int,str,list[any]]:
         '''返回order_id,store_id,state,order_datetime,book_id,count,price'''
         conn = self.conn
-        book_conn=self.book_conn
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)+([],)
@@ -369,12 +423,11 @@ class Buyer(db_conn.DBConn):
                 join history_order_detail as B on A.order_id=B.order_id
                 join store as C on A.store_id=C.store_id and B.book_id=C.book_id
                 where user_id='{}'""".format(user_id)
-            cursor=conn.execute(sql)
-            res=cursor.fetchall()
+            conn.execute(sql)
+            res = conn.fetchall()
             
-            conn.commit()
-        except sqlite.Error as e:
-            logging.info(str(e))
+            self.con.commit()
+        except psycopg2.Error as e:
             return 528, "{}".format(str(e)),[]
         except BaseException as e:
             return 530, "{}".format(str(e)),[]

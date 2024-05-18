@@ -61,12 +61,46 @@ def receive():
 
 @bp_buyer.route("/search", methods=["POST"])
 def search():
+    user_id=request.json.get("user_id")
     keyword=request.json.get("keyword")
     content=request.json.get("content")
     store_id=request.json.get("store_id")
     b=Buyer()
-    code,message,bids=b.search(keyword,content,store_id)
-    return jsonify({'message':message,'bids':bids}),code
+    code,message,pages=b.search(user_id,keyword,content,store_id)
+    return jsonify({'message':message,'pages':pages}),code
+
+@bp_buyer.route("/next_page", methods=["POST"])
+def next_page():
+    user_id=request.json.get("user_id")
+    page_now=request.json.get("page_now")
+    pages=request.json.get("pages")
+    have_pic=request.json.get("have_pic")
+
+    b=Buyer()
+    code,message,bids,page=b.next_page(user_id,page_now,pages,have_pic)
+    return jsonify({'message':message,'bids':bids,'page':page}),code
+
+@bp_buyer.route("/pre_page", methods=["POST"])
+def pre_page():
+    user_id=request.json.get("user_id")
+    page_now=request.json.get("page_now")
+    have_pic=request.json.get("have_pic")
+
+    b=Buyer()
+    code,message,bids,page=b.pre_page(user_id,page_now,have_pic)
+    return jsonify({'message':message,'bids':bids,'page':page}),code
+
+@bp_buyer.route("/specific_page", methods=["POST"])
+def specific_page():
+    user_id=request.json.get("user_id")
+    target_page=request.json.get("target_page")
+    page_now=request.json.get("page_now")
+    pages=request.json.get("pages")
+    have_pic=request.json.get("have_pic")
+
+    b=Buyer()
+    code,message,bids,page=b.specific_page(user_id,page_now,target_page,pages,have_pic)
+    return jsonify({'message':message,'bids':bids,'page':page}),code
 
 @bp_buyer.route("/history_order",methods=["POST"])
 def history_order():
