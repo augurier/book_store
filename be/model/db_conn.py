@@ -3,12 +3,15 @@ from fe import conf
 
 class DBConn:
     def __init__(self):
+        self.database = store.get_nosql_db_conn()
         self.con = store.get_db_conn()
         self.conn = self.con.cursor()
         if conf.Use_Large_DB:
             self.book_tb = 'book_lx'
+            self.col_book = self.database["book_lx"]
         else:
             self.book_tb = 'book'
+            self.col_book = self.database["book"]
 
     def user_id_exist(self, user_id):
         self.conn.execute(

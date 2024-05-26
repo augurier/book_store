@@ -1,3 +1,4 @@
+import logging
 import sqlite3 as sqlite
 
 import psycopg2
@@ -38,6 +39,7 @@ class Seller(db_conn.DBConn):
             # )
             self.con.commit()
         except psycopg2.Error as e:
+            logging.error(e)
             return 528, "{}".format(str(e))
         except BaseException as e:
             return 530, "{}".format(str(e))
@@ -73,9 +75,12 @@ class Seller(db_conn.DBConn):
             if self.store_id_exist(store_id):
                 return error.error_exist_store_id(store_id)
             self.conn.execute(
-                "INSERT into user_store(store_id, user_id) VALUES (%s, %s)",
-                (store_id, user_id),
+                "INSERT into user_store(user_id, store_id) VALUES (%s, %s)",
+                (user_id, store_id),
             )
+            if self.conn.rowcount != 1:
+                logging.error('fail')
+                return 528, 'fail'
             self.con.commit()
         except psycopg2.Error as e:
             return 528, "{}".format(str(e))

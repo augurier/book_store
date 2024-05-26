@@ -1,7 +1,7 @@
 import uuid
 import json
 import logging
-
+import pymongo.errors as mongo_error
 import psycopg2
 from be.model import db_conn
 from be.model import error
@@ -23,7 +23,13 @@ class Buyer(db_conn.DBConn):
             if not self.store_id_exist(store_id):
                 return error.error_non_exist_store_id(store_id) + (order_id,)
             uid = "{}_{}_{}".format(user_id, store_id, str(uuid.uuid1()))
-
+            
+            cur_time=str(int(time.time())) #纪元以来的秒数
+            self.conn.execute(
+                "INSERT INTO new_order(order_id, store_id, user_id, state, order_datetime) "
+                "VALUES(%s, %s, %s, %s, %s);",
+                (uid, store_id, user_id, "wait for payment", cur_time),
+            )
             for book_id, count in id_and_count:
                 self.conn.execute(
                     "SELECT book_id, stock_level, book_info FROM store "
@@ -53,13 +59,7 @@ class Buyer(db_conn.DBConn):
                     (uid, book_id, count, price),
                 )
 
-            # cur_time = time.strftime("%Y-%m-%d %H:%M:%S")
-            cur_time=str(int(time.time())) #纪元以来的秒数
-            self.conn.execute(
-                "INSERT INTO new_order(order_id, store_id, user_id,state,order_datetime) "
-                "VALUES(%s, %s, %s, %s, %s);",
-                (uid, store_id, user_id, "wait for payment", cur_time),
-            )
+
             self.con.commit()
             order_id = uid
         except psycopg2.Error as e:
@@ -79,16 +79,14 @@ class Buyer(db_conn.DBConn):
                                 (order_id,))
             conn.execute("UPDATE history_order SET state = 'cancelled' "
                                 "WHERE state='wait for payment' AND order_id=%s",
-                                (order_id,))
-            conn.execute("DELETE FROM new_order WHERE order_id=%s",
-                                (order_id,))
-            
+                                (order_id,))            
             conn.execute("INSERT INTO history_order_detail SELECT * FROM new_order_detail "
                                 "WHERE order_id=%s",
                                 (order_id,))
             conn.execute("DELETE FROM new_order_detail WHERE order_id=%s",
                                 (order_id,))
-
+            conn.execute("DELETE FROM new_order WHERE order_id=%s",
+                                (order_id,))
         except psycopg2.Error as e:
             logging.error(str(e))
             return 528, "{}".format(str(e))
@@ -180,9 +178,7 @@ class Buyer(db_conn.DBConn):
                 "WHERE order_id = %s",
                 (order_id,),
             )
-            conn.execute(
-                "DELETE FROM new_order WHERE order_id = %s", (order_id,)
-            )
+
 
             # order_detail从new_order_detail中删除并插入history_order_detail中
             conn.execute(
@@ -194,7 +190,10 @@ class Buyer(db_conn.DBConn):
             conn.execute(
                 "DELETE FROM new_order_detail where order_id = %s", (order_id,)
             )
-
+            
+            conn.execute(
+                "DELETE FROM new_order WHERE order_id = %s", (order_id,)
+            )
             self.con.commit()
 
         except psycopg2.Error as e:
@@ -237,6 +236,8 @@ class Buyer(db_conn.DBConn):
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
+            if not self.new_order_id_exist(order_id):
+                return error.error_invalid_order_id(order_id)
             #修改state状态，并将其从new_order移到history_order
             conn.execute(
                 "UPDATE new_order set state='cancelled' "
@@ -248,13 +249,7 @@ class Buyer(db_conn.DBConn):
                 "INSERT INTO history_order "
                 "SELECT * FROM new_order WHERE order_id=%s",
                 (order_id,)
-            )
-            conn.execute(
-                "DELETE FROM new_order "
-                "WHERE order_id=%s",
-                (order_id,)
-            )
-            
+            )     
             #将new_order_detail做出相应的改动
             conn.execute(
                 "INSERT INTO history_order_detail "
@@ -266,7 +261,12 @@ class Buyer(db_conn.DBConn):
                 "WHERE order_id=%s",
                 (order_id,)
             )
-
+            
+            conn.execute(
+                "DELETE FROM new_order "
+                "WHERE order_id=%s",
+                (order_id,)
+            )
             self.con.commit()
         except psycopg2.Error as e:
             logging.error(str(e))
@@ -280,6 +280,9 @@ class Buyer(db_conn.DBConn):
         try:
             if not self.user_id_exist(user_id):
                 return error.error_non_exist_user_id(user_id)
+            
+            if not self.his_order_id_exist(order_id):
+                return error.error_invalid_order_id(order_id)
 
             conn.execute(
                 "UPDATE history_order SET state='received' "
@@ -297,7 +300,6 @@ class Buyer(db_conn.DBConn):
     #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
     def search(self,user_id:str,keyword:str,content:str,store_id:str) -> tuple[(int,str,int)]:
         conn = self.conn
-        book_tb = self.book_tb
         try:
             self.conn.execute(
                 "UPDATE user_ SET bids = %s WHERE user_id = %s",
@@ -305,8 +307,8 @@ class Buyer(db_conn.DBConn):
             )
             self.con.commit()
             
-            keyword_scope = ['id', 'title', 'author', 'publisher', 'original_title', 'translator', 'pub_year', 'currency_unit', 'binding', 'isbn']
-            if keyword not in keyword_scope:
+            keys = self.col_book.find_one().keys()
+            if keyword not in keys or keyword == '_id':
                 return error.error_wrong_keyword(keyword)+(-1,)
             
             sql = """select distinct book_id from store """
@@ -318,18 +320,20 @@ class Buyer(db_conn.DBConn):
             row = conn.fetchall()
             if row == []:
                 return 200,"ok",0
-            bids:tuple[str,]=tuple(map(lambda x:x[0],row))
-            if len(bids) == 1 :
-                bids="('"+str(bids[0])+"')"
-              
-            search_sql="""select id from {} 
-                where id in {} and {} like '%{}%'""".format(book_tb,bids,keyword,content)
-            conn.execute(search_sql)
-            row = conn.fetchall()
-            if row == []:
-                logging.error('aaa')
-                return 200,"ok",0
-            res = list(map(lambda x:x[0],row))
+            bids = list(map(lambda x:x[0],row))
+            # bids:tuple[str,]=tuple(map(lambda x:x[0],row))
+            # if len(bids) == 1 :
+            #     bids="('"+str(bids[0])+"')"
+            rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
+                               {'_id': 0, 'id': 1})
+            res = list(map(lambda x:x['id'],rows)) 
+            # search_sql="""select id from {} 
+            #     where id in {} and {} like '%{}%'""".format(book_tb,bids,keyword,content)
+            # conn.execute(search_sql)
+            # row = conn.fetchall()
+            # if row == []:
+            #     return 200,"ok",0
+            # res = list(map(lambda x:x[0],row))
             bids = ','.join(res)
             conn.execute(
                 "UPDATE user_ SET bids = %s WHERE user_id = %s",
@@ -340,49 +344,47 @@ class Buyer(db_conn.DBConn):
         except psycopg2.Error as e:
             logging.error(e)
             return 528, "{}".format(str(e)),-1
+        except mongo_error.PyMongoError as e:
+            logging.error(e)
+            return 529, "{}".format(str(e)),-1
         except BaseException as e:
+            logging.error(e)
             return 530, "{}".format(str(e)),-1
         return 200,"ok",pages
     
     def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
         res = []
-        book_tb = self.book_tb
+        # book_tb = self.book_tb
         # have_pic=False
-        # if have_pic:
-        #     content = {'_id': 0}
-        # else:
-        #     content = {'_id': 0, 'picture': 0}
+        if have_pic:
+            content = {'_id': 0}
+        else:
+            content = {'_id': 0, 'picture': 0}
+            
         self.conn.execute(
             "select bids from user_ where user_id = %s",
             (user_id,)
         )
         row = self.conn.fetchone()
-        bids = tuple(row[0].split(','))
-        if len(bids) == 1 :
-            bids="('"+str(bids[0])+"')"
+        bids = row[0].split(',')
+        # bids = tuple(row[0].split(','))
+        # if len(bids) == 1 :
+        #     bids="('"+str(bids[0])+"')"
         # col_user = self.database["user"]
         # row = col_user.find_one({'user_id': user_id}, {'bids': 1})   
         # bids = row["bids"] 
-        sql = "select * from {}".format(book_tb)
-        # if have_pic:
-        #     sql = "select * from book "
-        # else:
-        #     sql = '''select id, title, author,
-        #     publisher, original_title,
-        #     translator, pub_year, pages,
-        #     price, currency_unit, binding,
-        #     isbn, author_intro, book_intro, 
-        #     content, tags from book '''
-        sql += " where id in {}".format(bids)
-        self.conn.execute(sql)
-        res = self.conn.fetchall()
-        self.con.commit()
-        # col_book = self.col_book
-        # rows = col_book.find({'id': {'$in': bids}}, content)
-        # res = [row for row in rows]  
-        # if have_pic:
-        #     for row in res:
-        #         row['picture']=str(row['picture'])
+        
+        # sql = "select * from {}".format(book_tb)
+        # sql += " where id in {}".format(bids)
+        # self.conn.execute(sql)
+        # res = self.conn.fetchall()
+        # self.con.commit()
+        col_book = self.col_book
+        rows = col_book.find({'id': {'$in': bids}}, content)
+        res = [row for row in rows]  
+        if have_pic:
+            for row in res:
+                row['picture']=str(row['picture'])
         return res
     
     def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:

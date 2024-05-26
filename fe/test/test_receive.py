@@ -45,3 +45,25 @@ class TestReceive:
         assert code == 200
         code = self.buyer.receive(self.order_id)
         assert code == 200
+        
+    def test_non_exist_order_id(self):
+        code = self.buyer.add_funds(self.total_price)
+        assert code == 200
+        code = self.buyer.payment(self.order_id)
+        assert code == 200
+        code = self.seller.deliver(self.order_id)
+        assert code == 200
+        self.order_id += '_x'
+        code = self.buyer.receive(self.order_id)
+        assert code != 200
+        
+    def test_non_exist_user_id(self):
+        code = self.buyer.add_funds(self.total_price)
+        assert code == 200
+        code = self.buyer.payment(self.order_id)
+        assert code == 200
+        code = self.seller.deliver(self.order_id)
+        assert code == 200
+        self.buyer.user_id += '_x'
+        code = self.buyer.receive(self.order_id)
+        assert code != 200

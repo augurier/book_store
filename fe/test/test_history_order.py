@@ -51,6 +51,15 @@ class TestSearch:
         assert code == 200
         code,history_order=self.buyer.history_order()
         assert code == 200
-        logging.info(history_order)
         assert self.order_id in list(map(lambda x:x[0],history_order))
+        
+    def test_non_exit_user_id(self):
+        code=self.buyer.add_funds(self.total_price)
+        assert code == 200
+        code=self.buyer.payment(self.order_id)
+        assert code == 200
+        self.buyer.user_id += '_x'
+        code,history_order=self.buyer.history_order()
+        assert code != 200
+
         

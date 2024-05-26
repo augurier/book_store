@@ -66,6 +66,9 @@ class User(db_conn.DBConn):
                 "VALUES (%s, %s, %s, %s, %s, %s)",
                 (user_id, password, 0, token, terminal, '')
             )
+            if self.conn.rowcount != 1:
+                logging.error('fail')
+                return 528, 'fail'
             self.con.commit()
         except psycopg2.Error as e:
             logging.error(e)
